@@ -1,7 +1,5 @@
 package Business::OnlinePayment::AuthorizeNet;
 
-# $Id: AuthorizeNet.pm,v 1.16 2002/11/22 00:49:17 ivan Exp $
-
 use strict;
 use Carp;
 use Business::OnlinePayment;
@@ -14,7 +12,7 @@ require Exporter;
 @ISA = qw(Exporter AutoLoader Business::OnlinePayment);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.12';
+$VERSION = '3.13';
 
 sub set_defaults {
     my $self = shift;
@@ -23,7 +21,7 @@ sub set_defaults {
     $self->port('443');
     $self->path('/gateway/transact.dll');
 
-    $self->build_subs('order_number'); #no idea how it worked for jason w/o this
+    $self->build_subs(qw(order_number md5 avs_code));
 }
 
 sub map_fields {
@@ -36,6 +34,7 @@ sub map_fields {
                    'authorization only'   => 'AUTH_ONLY',
                    'credit'               => 'CREDIT',
                    'post authorization'   => 'PRIOR_AUTH_CAPTURE',
+                   'void'                 => 'VOID',
                   );
     $content{'action'} = $actions{lc($content{'action'})} || $content{'action'};
 
@@ -84,6 +83,7 @@ sub submit {
         type           => 'x_Method',
         login          => 'x_Login',
         password       => 'x_Password',
+        transaction_key       => 'x_Tran_Key',
         action         => 'x_Type',
         description    => 'x_Description',
         amount         => 'x_Amount',
@@ -108,7 +108,7 @@ sub submit {
         expiration     => 'x_Exp_Date',
         cvv2           => 'x_Card_Code',
         check_type     => 'x_Echeck_Type',
-	account_name   => 'x_Bank_Account_Name',
+	account_name   => 'x_Bank_Acct_Name',
         account_number => 'x_Bank_Acct_Num',
         account_type   => 'x_Bank_Acct_Type',
         bank_name      => 'x_Bank_Name',
@@ -118,34 +118,42 @@ sub submit {
         license_num    => 'x_Drivers_License_Num',
         license_state  => 'x_Drivers_License_State',
         license_dob    => 'x_Drivers_License_DOB',
+        recurring_billing    => 'x_Recurring_Billing',
     );
+    my $auth_type = $self->{_content}->{transaction_key}?'transaction_key':'password';
 
     if ($self->transaction_type() eq "ECHECK") {
         if ($self->{_content}->{customer_org} ne '') {
-            $self->required_fields(qw/type login password amount routing_code
+            $self->required_fields(qw/type login amount routing_code
                                   account_number account_type bank_name
-                                  account_name account_type check_type
-                                  customer_org customer_ssn/);
+                                  account_name account_type
+                                  customer_org customer_ssn/, $auth_type);
         } else {
-            $self->required_fields(qw/type login password amount routing_code
+            $self->required_fields(qw/type login amount routing_code
                                   account_number account_type bank_name
-                                  account_name account_type check_type
-                                  license_num license_state license_dob/);
+                                  account_name account_type
+                                  license_num license_state license_dob/, $auth_type);
         }
     } elsif ($self->transaction_type() eq 'CC' ) {
       if ( $self->{_content}->{action} eq 'PRIOR_AUTH_CAPTURE' ) {
-        $self->required_fields(qw/type login password action amount
-                                  card_number expiration/);
+          if ( $self->{_content}->{order_number}) {
+              $self->required_fields(qw/type login action amount/, $auth_type);
+          } else {
+              $self->required_fields(qw/type login action amount 
+                                        card_number expiration/, $auth_type);
+          }
+      } elsif ( $self->{_content}->{action} eq 'VOID' ) {
+        $self->required_fields(qw/login action/,$auth_type);
       } else {
-        $self->required_fields(qw/type login password action amount last_name
-                                  first_name card_number expiration/);
+        $self->required_fields(qw/type login action amount last_name
+                                  first_name card_number expiration/, $auth_type);
       }
     } else {
         Carp::croak("AuthorizeNet can't handle transaction type: ".
                     $self->transaction_type());
     }
 
-    my %post_data = $self->get_fields(qw/x_Login x_Password x_Invoice_Num
+    my %post_data = $self->get_fields(qw/x_Login x_Password x_Tran_Key x_Invoice_Num
         x_Description x_Amount x_Cust_ID x_Method x_Type x_Card_Num x_Exp_Date
         x_Card_Code x_Auth_Code x_Echeck_Type x_Bank_Acct_Num
         x_Bank_Account_Name x_Bank_ABA_Code x_Bank_Name x_Bank_Acct_Type
@@ -173,11 +181,13 @@ sub submit {
     my @col = $csv->fields();
 
     $self->server_response($page);
+    $self->avs_code($col[5]);
+    $self->order_number($col[6]);
+    $self->md5($col[37]);
     if($col[0] eq "1" ) { # Authorized/Pending/Test
         $self->is_success(1);
         $self->result_code($col[0]);
         $self->authorization($col[4]);
-	$self->order_number($col[6]);
     } else {
         $self->is_success(0);
         $self->result_code($col[2]);
@@ -239,11 +249,11 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
 
 =head2 Visa, MasterCard, American Express, Discover
 
-Content required: type, login, password, action, amount, first_name, last_name, card_number, expiration.
+Content required: type, login, password|transaction_key, action, amount, first_name, last_name, card_number, expiration.
 
 =head2 Check
 
-Content required: type, login, password, action, amount, first_name, last_name, account_number, routing_code, bank_name.
+Content required: type, login, password|transaction_key, action, amount, first_name, last_name, account_number, routing_code, bank_name.
 
 =head1 DESCRIPTION
 
@@ -255,12 +265,12 @@ Unlike Business::OnlinePayment or pre-3.0 verisons of
 Business::OnlinePayment::AuthorizeNet, 3.1 requires separate first_name and
 last_name fields.
 
-Business::OnlinePayment::AuthorizeNet uses the ADC direct response method,
-and sends a username and password with every transaction.  Therefore,
-Authorize.Net's referrer "security" is not necessary.  In your Authorize.Net
-interface at https://secure.authorize.net/ make sure the list of allowable
-referers is blank.  Alternatively, set the B<referer> field in the transaction
-content.
+Business::OnlinePayment::AuthorizeNet uses Authorize.Net's "Advanced
+Integration Method (AIM) (formerly known as ADC direct response)", sending a
+username and transaction_key or password with every transaction.  Therefore, Authorize.Net's
+referrer "security" is not necessary.  In your Authorize.Net interface at
+https://secure.authorize.net/ make sure the list of allowable referers is
+blank.  Alternatively, set the B<referer> field in the transaction content.
 
 To settle an authorization-only transaction (where you set action to
 'Authorization Only'), submit the nine-digit transaction id code in
@@ -288,7 +298,8 @@ https://secure.authorize.net/docs/developersguide.pml for details.
 Jason Kohles, jason@mediabang.com
 
 Ivan Kohler <ivan-authorizenet@420.am> updated it for Authorize.Net protocol
-3.0/3.1 and is the current maintainer.
+3.0/3.1 and is the current maintainer.  Please send patches as unified diffs
+(diff -u).
 
 Jason Spence <jspence@lightconsulting.com> contributed support for separate
 Authorization Only and Post Authorization steps and wrote some docs.
@@ -297,6 +308,15 @@ OST <services@ostel.com> paid for it.
 T.J. Mather <tjmather@maxmind.com> sent a patch for the CVV2 field.
 
 Mike Barry <mbarry@cos.com> sent in a patch for the referer field.
+
+Yuri V. Mkrtumyan <yuramk@novosoft.ru> sent in a patch to add the void action.
+
+Paul Zimmer <AuthorizeNetpm@pzimmer.box.bepress.com> sent in a patch for
+card-less post authorizations.
+
+Daemmon Hughes <daemmon@daemmonhughes.com> sent in a patch for "transaction
+key" authentication as well support for the recurring_billing flag and the md5'
+method that returns the MD5 hash which is returned by the gateway.
 
 =head1 SEE ALSO
 

@@ -1,17 +1,34 @@
 Revision history for Perl extension Business::OnlinePayment::AuthorizeNet.
 
+3.13  Sun Aug 10 21:56:34 PDT 2003
+	- removed Michael Mavroudis's email address
+	- added 'void' action, patch from Yuri V. Mkrtumyan
+	  <yuramk@novosoft.ru>
+	- allow "Post Authorize" with order_number but no card info, patch
+	  from Paul Zimmer <AuthorizeNetpm@pzimmer.box.bepress.com>
+	- Don't require "check_type" field
+	- s/x_Bank_Account_Name/x_Bank_Acct_Name/ for ACH transactions
+	From Daemon Hughes <daemmon@daemmonhughes.com>:
+	- add "transaction key" (x_Tran_Key) authentication in addition to
+	  password
+	- add "recurring_billing" field
+	- added "md5" method
+	From valerian <valerian2@hotpop.com>:
+	- Added "avs_code" method
+	- Return "order_number" for unsucessful transactions also
+
 3.12  Thu Nov 21 17:05:19 2002
-	- Added cvv2 field, patch from "T.J. Mather" <tjmather@maxmind.com>
+	- Added cvv2 field, patch from T.J. Mather <tjmather@maxmind.com>
 	  (closes: cpan#1805)
 	- Added referer field, patch from Mike Barry <mbarry@cos.com>
 	- Added currency field, request from
-	  "Oleksandr Kapitanenko" <kapitan@portaone.com>
+	  Oleksandr Kapitanenko <kapitan@portaone.com>
 	- Added documentation about referrer field at Authorize.Net
 	- Added nonascii.patch from "T.J. Mather" <tjmather@maxmind.com> to
 	  put Text::CSV in binary mode to prevent problems with i18n
 	  characters (closes: cpan#1804)
-	- ECHECK (ACH) patch from "Michael Mavroudis" <mjm@m5s.net> to add
-	  fields for ssn and license #
+	- ECHECK (ACH) patch from Michael Mavroudis <email removed by
+	  request> to add fields for ssn and license #
 
 3.11  Sat May  4 00:43:36 PDT 2002
 	- forgot 3.10 changelog in 3.10 :)
