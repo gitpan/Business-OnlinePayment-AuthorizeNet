@@ -1,10 +1,10 @@
 package Business::OnlinePayment::AuthorizeNet;
 
-# $Id: AuthorizeNet.pm,v 1.10 1999/10/01 18:29:05 robobob Exp $
+# $Id: AuthorizeNet.pm,v 2.1 1999/10/10 05:52:11 robobob Exp $
 
 use strict;
 use Business::OnlinePayment;
-use Net::SSLeay;
+use Net::SSLeay qw/make_form post_https/;
 use Text::CSV;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 
@@ -15,7 +15,8 @@ require Exporter;
 # names by default without a very good reason. Use EXPORT_OK instead.
 # Do not simply export all your public functions/methods/constants.
 @EXPORT = qw();
-( $VERSION ) = '$Revision: 1.10 $ ' =~ /\$Revision:\s+([^\s]+)/;
+@EXPORT_OK = qw();
+$VERSION = do { my @r=(q$Revision: 2.1 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 
 # Preloaded methods go here.
 
@@ -107,9 +108,11 @@ sub submit {
     $post_data{'ECHODATA'} = "TRUE";
     $post_data{'ENCAPSULATE'} = "TRUE";
 
-    my $pd = &Net::SSLeay::make_form(%post_data);
-    my($page,$server_response,%headers) = &Net::SSLeay::post_https(
-        $self->server(), $self->port(), $self->path(), '', $pd);
+    my $pd = &make_form(%post_data);
+    my $s = $self->server();
+    my $p = $self->port();
+    my $t = $self->path();
+    my($page,$server_response,%headers) = &post_https($s,$p,$t,'',$pd);
 
     my $csv = new Text::CSV();
     $csv->parse($page);
