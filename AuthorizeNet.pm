@@ -1,6 +1,6 @@
 package Business::OnlinePayment::AuthorizeNet;
 
-# $Id: AuthorizeNet.pm,v 1.1.1.1 2001/09/01 21:47:31 ivan Exp $
+# $Id: AuthorizeNet.pm,v 1.2 2001/11/14 21:44:07 ivan Exp $
 
 use strict;
 use Business::OnlinePayment;
@@ -13,7 +13,7 @@ require Exporter;
 @ISA = qw(Exporter AutoLoader Business::OnlinePayment);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.00';
+$VERSION = '3.01';
 
 sub set_defaults {
     my $self = shift;

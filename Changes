@@ -1,5 +1,9 @@
 Revision history for Perl extension Business::OnlinePayment::AuthorizeNet.
 
+3.01  Wed Nov 14 13:42:06 2001
+	- update README
+	- disable t/credit_card.t test; testdrive account no longer valid
+
 3.00  Sat Sep  1 13:29:34 2001
 	- new maintainer, updated for Authorize.Net API 3.0
 

@@ -1,12 +1,14 @@
 BEGIN { $| = 1; print "1..1\n"; }
 
+print "ok 1 # Skipped: need a valid Authorize.Net login/password to test\n"; exit;
+
 use Business::OnlinePayment;
 
 my $tx = new Business::OnlinePayment("AuthorizeNet");
 $tx->content(
     type           => 'VISA',
-    login          => 'testdrive',
-    password       => 'testdrive',
+    login          => 'testdrive', # CHANGE THESE TO TEST
+    password       => 'testdrive', #
     action         => 'Normal Authorization',
     description    => 'Business::OnlinePayment visa test',
     amount         => '49.95',
@@ -19,7 +21,7 @@ $tx->content(
     state          => 'UT',
     zip            => '84058',
     card_number    => '4007000000027',
-    expiration     => '08/26',
+    expiration     => '08/06',
 );
 $tx->test_transaction(1); # test, dont really charge
 $tx->submit();

@@ -3,9 +3,11 @@ Copyright (c) 2001 Ivan Kohler
 All rights reserved. This program is free software; you can redistribute it
 and/or modify it under the same terms as Perl itself.
 
-This is Business::OnlinePayment::AuthorizeNet, an Authorize.Net-specific
-backend module for Business::OnlinePayment.  It has been updated and now
-implements Authorize.Net API version 3.0.
+This is Business::OnlinePayment::AuthorizeNet, an Business::OnlinePayment
+backend module for Authorize.Net.  It is only useful if you have a merchant
+account with Authorize.Net: http://www.authorize.net
+
+This module has been updated and now implements Authorize.Net API version 3.0.
 
 Jason Kohles is the original author.
 Ivan Kohler <ivan-authorizenet@420.am> is the current maintainer.
