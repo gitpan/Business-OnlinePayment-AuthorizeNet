@@ -12,7 +12,7 @@ require Exporter;
 @ISA = qw(Exporter AutoLoader Business::OnlinePayment);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.14';
+$VERSION = '3.15';
 
 sub set_defaults {
     my $self = shift;
@@ -160,6 +160,8 @@ sub submit {
           } else {
             push @required_fields, qw( amount card_number expiration );
           }
+        } elsif ( $self->{_content}->{action} eq 'CREDIT' ) {
+          push @required_fields, qw( amount order_number card_number );
         } else {
           push @required_fields, qw(
             amount last_name first_name card_number expiration
@@ -191,6 +193,8 @@ sub submit {
         x_Currency_Code x_Trans_ID/);
     $post_data{'x_Test_Request'} = $self->test_transaction()?"TRUE":"FALSE";
     $post_data{'x_ADC_Delim_Data'} = 'TRUE';
+    $post_data{'x_delim_char'} = ',';
+    $post_data{'x_encap_char'} = '"';
     $post_data{'x_ADC_URL'} = 'FALSE';
     $post_data{'x_Version'} = '3.1';
 

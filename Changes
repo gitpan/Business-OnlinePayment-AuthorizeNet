@@ -1,5 +1,10 @@
 Revision history for Perl extension Business::OnlinePayment::AuthorizeNet.
 
+3.15  Wed Mar 16 01:10:51 PST 2005
+	- Ask for ',' delimiter and '"' quote explicitly to prevent problems
+	  when a merchant has them configured differently.
+	- expiration is not a required field for credits
+
 3.14  Tue Sep 21 01:10:46 PDT 2004
 	- Added ship_ name/address fields
 	- Fixed required fields for echeck voiding
