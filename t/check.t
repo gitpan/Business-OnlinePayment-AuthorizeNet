@@ -1,6 +1,6 @@
 BEGIN { $| = 1; print "1..1\n"; }
 
-print "ok 1 # Skipped: testdrive account won't accept ACH transactions\n"; exit;
+print "ok 1 # Skipped: testing account won't accept ACH transactions\n"; exit;
 
 use Business::OnlinePayment;
 
@@ -8,8 +8,8 @@ use Business::OnlinePayment;
 my $ctx = new Business::OnlinePayment("AuthorizeNet");
 $ctx->content(
     type           => 'CHECK',
-    login          => 'testdrive',
-    password       => 'testdrive',
+    login          => 'testing',
+    password       => 'testing',
     action         => 'Normal Authorization',
     amount         => '49.95',
     invoice_number => '100100',

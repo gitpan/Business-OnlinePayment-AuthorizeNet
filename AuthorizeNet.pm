@@ -1,11 +1,11 @@
 package Business::OnlinePayment::AuthorizeNet;
 
-# $Id: AuthorizeNet.pm,v 1.2 2001/11/14 21:44:07 ivan Exp $
+# $Id: AuthorizeNet.pm,v 1.6 2002/03/13 16:11:55 ivan Exp $
 
 use strict;
 use Business::OnlinePayment;
 use Net::SSLeay qw/make_form post_https/;
-use Text::CSV;
+use Text::CSV_XS;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 
 require Exporter;
@@ -13,7 +13,7 @@ require Exporter;
 @ISA = qw(Exporter AutoLoader Business::OnlinePayment);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.01';
+$VERSION = '3.10';
 
 sub set_defaults {
     my $self = shift;
@@ -21,6 +21,8 @@ sub set_defaults {
     $self->server('secure.authorize.net');
     $self->port('443');
     $self->path('/gateway/transact.dll');
+
+    $self->build_subs('order_number'); #no idea how it worked for jason w/o this
 }
 
 sub map_fields {
@@ -98,6 +100,7 @@ sub submit {
         fax            => 'x_Fax',
         email          => 'x_Email',
         company        => 'x_Company',
+	order_number   => 'x_Trans_ID',
     );
 
     if($self->transaction_type() eq "ECHECK") {
@@ -105,8 +108,13 @@ sub submit {
                                   first_name account_number routing_code
                                   bank_name/);
     } elsif($self->transaction_type() eq 'CC' ) {
+      if ( $self->{_content}->{action} eq 'PRIOR_AUTH_CAPTURE' ) {
+        $self->required_fields(qw/type login password action amount
+                                  card_number expiration/);
+      } else {
         $self->required_fields(qw/type login password action amount last_name
                                   first_name card_number expiration/);
+      }
     } else {
         Carp::croak("AuthorizeNet can't handle transaction type: ".
                     $self->transaction_type());
@@ -120,11 +128,11 @@ sub submit {
                                          x_Last_Name x_First_Name x_Address
                                          x_City x_State x_Zip x_Country x_Phone
                                          x_Fax x_Email x_Email_Customer
-                                         x_Company x_Country/); 
+                                         x_Company x_Country x_Trans_ID/); 
     $post_data{'x_Test_Request'} = $self->test_transaction()?"TRUE":"FALSE";
     $post_data{'x_ADC_Delim_Data'} = 'TRUE';
     $post_data{'x_ADC_URL'} = 'FALSE';
-    $post_data{'x_Version'} = '3.0';
+    $post_data{'x_Version'} = '3.1';
 
     my $pd = make_form(%post_data);
     my $s = $self->server();
@@ -132,7 +140,7 @@ sub submit {
     my $t = $self->path();
     my($page,$server_response,%headers) = post_https($s,$p,$t,'',$pd);
 
-    my $csv = new Text::CSV();
+    my $csv = new Text::CSV_XS();
     $csv->parse($page);
     my @col = $csv->fields();
 
@@ -141,6 +149,7 @@ sub submit {
         $self->is_success(1);
         $self->result_code($col[0]);
         $self->authorization($col[4]);
+	$self->order_number($col[6]);
     } else {
         $self->is_success(0);
         $self->result_code($col[2]);
@@ -176,7 +185,7 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
       state          => 'UT',
       zip            => '84058',
       card_number    => '4007000000027',
-      expiration     => '09/99',
+      expiration     => '09/02',
   );
   $tx->submit();
 
@@ -202,20 +211,41 @@ For detailed information see L<Business::OnlinePayment>.
 
 =head1 NOTE
 
-Unlike Business::OnlinePayment or previous verisons of
-Business::OnlinePayment::AuthorizeNet, 3.0 requires separate first_name and
+Unlike Business::OnlinePayment or pre-3.0 verisons of
+Business::OnlinePayment::AuthorizeNet, 3.1 requires separate first_name and
 last_name fields.
+
+To settle an authorization-only transaction (where you set action to
+'Authorization Only'), submit the nine-digit transaction id code in
+the field "order_number" with the action set to "Post Authorization".
+You can get the transaction id from the authorization by calling the
+order_number method on the object returned from the authorization.
+You must also submit the amount field with a value less than or equal
+to the amount specified in the original authorization.
+
+Recently (February 2002), Authorize.Net has turned address
+verification on by default for all merchants.  If you do not have
+valid address information for your customer (such as in an IVR
+application), you must disable address verification in the Merchant
+Menu page at https://secure.authorize.net/ so that the transactions
+aren't denied due to a lack of address information.
 
 =head1 COMPATIBILITY
 
-This module implements Authorize.Net's API verison 3.0.
+This module implements Authorize.Net's API verison 3.1 using the ADC
+Direct Response method.  See
+https://secure.authorize.net/docs/developersguide.pml for details.
 
 =head1 AUTHOR
 
 Jason Kohles, jason@mediabang.com
 
 Ivan Kohler <ivan-authorizenet@420.am> updated it for Authorize.Net protocol
-3.0 and is the current maintainer.
+3.0/3.1 and is the current maintainer.
+
+Jason Spence <jspence@lightconsulting.com> contributed support for separate
+Authorization Only and Post Authorization steps and wrote some docs.
+OST <services@ostel.com> paid for it.
 
 =head1 SEE ALSO
 

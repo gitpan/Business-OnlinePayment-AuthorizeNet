@@ -7,3 +7,4 @@ t/load.t
 t/credit_card.t
 t/check.t
 t/bop.t
+t/capture.t

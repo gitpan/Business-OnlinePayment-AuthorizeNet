@@ -1,14 +1,15 @@
 BEGIN { $| = 1; print "1..1\n"; }
 
-print "ok 1 # Skipped: need a valid Authorize.Net login/password to test\n"; exit;
+#testing/testing is valid and seems to work...
+#print "ok 1 # Skipped: need a valid Authorize.Net login/password to test\n"; exit;
 
 use Business::OnlinePayment;
 
 my $tx = new Business::OnlinePayment("AuthorizeNet");
 $tx->content(
     type           => 'VISA',
-    login          => 'testdrive', # CHANGE THESE TO TEST
-    password       => 'testdrive', #
+    login          => 'testing',
+    password       => 'testing',
     action         => 'Normal Authorization',
     description    => 'Business::OnlinePayment visa test',
     amount         => '49.95',
@@ -29,5 +30,6 @@ $tx->submit();
 if($tx->is_success()) {
     print "ok 1\n";
 } else {
+    #warn $tx->error_message;
     print "not ok 1\n";
 }
