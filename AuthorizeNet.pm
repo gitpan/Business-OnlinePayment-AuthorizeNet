@@ -1,6 +1,6 @@
 package Business::OnlinePayment::AuthorizeNet;
 
-# $Id: AuthorizeNet.pm,v 1.6 2002/03/13 16:11:55 ivan Exp $
+# $Id: AuthorizeNet.pm,v 1.10 2002/04/24 05:02:54 ivan Exp $
 
 use strict;
 use Business::OnlinePayment;
@@ -13,7 +13,7 @@ require Exporter;
 @ISA = qw(Exporter AutoLoader Business::OnlinePayment);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.10';
+$VERSION = '3.11';
 
 sub set_defaults {
     my $self = shift;
@@ -139,6 +139,8 @@ sub submit {
     my $p = $self->port();
     my $t = $self->path();
     my($page,$server_response,%headers) = post_https($s,$p,$t,'',$pd);
+    #escape NULL (binary 0x00) values
+    $page =~ s/\x00/\^0/g;
 
     my $csv = new Text::CSV_XS();
     $csv->parse($page);
@@ -154,6 +156,16 @@ sub submit {
         $self->is_success(0);
         $self->result_code($col[2]);
         $self->error_message($col[3]);
+        unless ( $self->result_code() ) { #additional logging information
+          #$page =~ s/\x00/\^0/g;
+          $self->error_message($col[3].
+            " DEBUG: No x_response_code from server, ".
+            "(HTTPS response: $server_response) ".
+            "(HTTPS headers: ".
+              join(", ", map { "$_ => ". $headers{$_} } keys %headers ). ") ".
+            "(Raw HTTPS content: $page)"
+          );
+        }
     }
 }
 

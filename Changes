@@ -1,5 +1,18 @@
 Revision history for Perl extension Business::OnlinePayment::AuthorizeNet.
 
+3.11  Sat May  4 00:43:36 PDT 2002
+	- forgot 3.10 changelog in 3.10 :)
+	- extremely verbose debugging information for responses without
+	  response code
+	- PREREQ_PM on Business::OnlinePayment
+	- Escape 0x00 (NULL) in responses from Authorize.Net.  wtf?
+
+3.10  Wed Mar 13 2002
+	- updated for Authorize.Net API 3.1
+	- enable t/credit_card.t test again; testing account seems to work
+	- working Post Authorization support
+	- s/CSV/CSV_XS/
+
 3.01  Wed Nov 14 13:42:06 2001
 	- update README
 	- disable t/credit_card.t test; testdrive account no longer valid

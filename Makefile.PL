@@ -7,6 +7,9 @@ WriteMakefile(
     'AUTHOR'       => 'Ivan Kohler <ivan-authorizenet@420.am>', #really just
                                                                 #the maintainer
     #'NORECURS'     => 1, # dont descend into subdirectories
-    'PREREQ_PM'    => {'Net::SSLeay' => 0, 'Text::CSV_XS' => 0},
+    'PREREQ_PM'    => { 'Net::SSLeay' => 0,
+                        'Text::CSV_XS' => 0,
+                        'Business::OnlinePayment' => 0,
+                      },
     #'dist'         => {CI => 'ci -l'},
 );
