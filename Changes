@@ -1,5 +1,18 @@
 Revision history for Perl extension Business::OnlinePayment::AuthorizeNet.
 
+3.12  Thu Nov 21 17:05:19 2002
+	- Added cvv2 field, patch from "T.J. Mather" <tjmather@maxmind.com>
+	  (closes: cpan#1805)
+	- Added referer field, patch from Mike Barry <mbarry@cos.com>
+	- Added currency field, request from
+	  "Oleksandr Kapitanenko" <kapitan@portaone.com>
+	- Added documentation about referrer field at Authorize.Net
+	- Added nonascii.patch from "T.J. Mather" <tjmather@maxmind.com> to
+	  put Text::CSV in binary mode to prevent problems with i18n
+	  characters (closes: cpan#1804)
+	- ECHECK (ACH) patch from "Michael Mavroudis" <mjm@m5s.net> to add
+	  fields for ssn and license #
+
 3.11  Sat May  4 00:43:36 PDT 2002
 	- forgot 3.10 changelog in 3.10 :)
 	- extremely verbose debugging information for responses without

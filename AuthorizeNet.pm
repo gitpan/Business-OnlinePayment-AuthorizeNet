@@ -1,10 +1,11 @@
 package Business::OnlinePayment::AuthorizeNet;
 
-# $Id: AuthorizeNet.pm,v 1.10 2002/04/24 05:02:54 ivan Exp $
+# $Id: AuthorizeNet.pm,v 1.16 2002/11/22 00:49:17 ivan Exp $
 
 use strict;
+use Carp;
 use Business::OnlinePayment;
-use Net::SSLeay qw/make_form post_https/;
+use Net::SSLeay qw/make_form post_https make_headers/;
 use Text::CSV_XS;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 
@@ -13,7 +14,7 @@ require Exporter;
 @ISA = qw(Exporter AutoLoader Business::OnlinePayment);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.11';
+$VERSION = '3.12';
 
 sub set_defaults {
     my $self = shift;
@@ -47,6 +48,10 @@ sub map_fields {
                 );
     $content{'type'} = $types{lc($content{'type'})} || $content{'type'};
     $self->transaction_type($content{'type'});
+
+    $content{'referer'} = defined( $content{'referer'} )
+                            ? make_headers( 'Referer' => $content{'referer'} )
+                            : "";
 
     # stuff it back into %content
     $self->content(%content);
@@ -82,32 +87,52 @@ sub submit {
         action         => 'x_Type',
         description    => 'x_Description',
         amount         => 'x_Amount',
+        currency       => 'x_Currency_Code',
         invoice_number => 'x_Invoice_Num',
+	order_number   => 'x_Trans_ID',
+	auth_code      => 'x_Auth_Code',
         customer_id    => 'x_Cust_ID',
+        customer_ip    => 'x_Customer_IP',
         last_name      => 'x_Last_Name',
         first_name     => 'x_First_Name',
         address        => 'x_Address',
         city           => 'x_City',
         state          => 'x_State',
         zip            => 'x_Zip',
-        card_number    => 'x_Card_Num',
-        expiration     => 'x_Exp_Date',
-        account_number => 'x_Bank_Acct_Num',
-        routing_code   => 'x_Bank_ABA_Code',
-        bank_name      => 'x_Bank_Name',
         country        => 'x_Country',
         phone          => 'x_Phone',
         fax            => 'x_Fax',
         email          => 'x_Email',
         company        => 'x_Company',
-	order_number   => 'x_Trans_ID',
+        card_number    => 'x_Card_Num',
+        expiration     => 'x_Exp_Date',
+        cvv2           => 'x_Card_Code',
+        check_type     => 'x_Echeck_Type',
+	account_name   => 'x_Bank_Account_Name',
+        account_number => 'x_Bank_Acct_Num',
+        account_type   => 'x_Bank_Acct_Type',
+        bank_name      => 'x_Bank_Name',
+        routing_code   => 'x_Bank_ABA_Code',
+        customer_org   => 'x_Customer_Organization_Type', 
+        customer_ssn   => 'x_Customer_Tax_ID',
+        license_num    => 'x_Drivers_License_Num',
+        license_state  => 'x_Drivers_License_State',
+        license_dob    => 'x_Drivers_License_DOB',
     );
 
-    if($self->transaction_type() eq "ECHECK") {
-        $self->required_fields(qw/type login password action amount last_name
-                                  first_name account_number routing_code
-                                  bank_name/);
-    } elsif($self->transaction_type() eq 'CC' ) {
+    if ($self->transaction_type() eq "ECHECK") {
+        if ($self->{_content}->{customer_org} ne '') {
+            $self->required_fields(qw/type login password amount routing_code
+                                  account_number account_type bank_name
+                                  account_name account_type check_type
+                                  customer_org customer_ssn/);
+        } else {
+            $self->required_fields(qw/type login password amount routing_code
+                                  account_number account_type bank_name
+                                  account_name account_type check_type
+                                  license_num license_state license_dob/);
+        }
+    } elsif ($self->transaction_type() eq 'CC' ) {
       if ( $self->{_content}->{action} eq 'PRIOR_AUTH_CAPTURE' ) {
         $self->required_fields(qw/type login password action amount
                                   card_number expiration/);
@@ -121,14 +146,14 @@ sub submit {
     }
 
     my %post_data = $self->get_fields(qw/x_Login x_Password x_Invoice_Num
-                                         x_Description x_Amount x_Cust_ID
-                                         x_Method x_Type x_Card_Num x_Exp_Date
-                                         x_Auth_Code x_Bank_Acct_Num
-                                         x_Bank_ABA_Code x_Bank_Name
-                                         x_Last_Name x_First_Name x_Address
-                                         x_City x_State x_Zip x_Country x_Phone
-                                         x_Fax x_Email x_Email_Customer
-                                         x_Company x_Country x_Trans_ID/); 
+        x_Description x_Amount x_Cust_ID x_Method x_Type x_Card_Num x_Exp_Date
+        x_Card_Code x_Auth_Code x_Echeck_Type x_Bank_Acct_Num
+        x_Bank_Account_Name x_Bank_ABA_Code x_Bank_Name x_Bank_Acct_Type
+        x_Customer_Organization_Type x_Customer_Tax_ID x_Customer_IP
+        x_Drivers_License_Num x_Drivers_License_State x_Drivers_License_DOB
+        x_Last_Name x_First_Name x_Address x_City x_State x_Zip x_Country
+        x_Phone x_Fax x_Email x_Email_Customer x_Company x_Country
+        x_Currency_Code x_Trans_ID/);
     $post_data{'x_Test_Request'} = $self->test_transaction()?"TRUE":"FALSE";
     $post_data{'x_ADC_Delim_Data'} = 'TRUE';
     $post_data{'x_ADC_URL'} = 'FALSE';
@@ -138,11 +163,12 @@ sub submit {
     my $s = $self->server();
     my $p = $self->port();
     my $t = $self->path();
-    my($page,$server_response,%headers) = post_https($s,$p,$t,'',$pd);
+    my $r = $self->{_content}->{referer};
+    my($page,$server_response,%headers) = post_https($s,$p,$t,$r,$pd);
     #escape NULL (binary 0x00) values
     $page =~ s/\x00/\^0/g;
 
-    my $csv = new Text::CSV_XS();
+    my $csv = new Text::CSV_XS({ 'binary'=>1 });
     $csv->parse($page);
     my @col = $csv->fields();
 
@@ -198,6 +224,8 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
       zip            => '84058',
       card_number    => '4007000000027',
       expiration     => '09/02',
+      cvv2           => '1234', #optional
+      referer        => 'http://valid.referer.url/',
   );
   $tx->submit();
 
@@ -226,6 +254,13 @@ For detailed information see L<Business::OnlinePayment>.
 Unlike Business::OnlinePayment or pre-3.0 verisons of
 Business::OnlinePayment::AuthorizeNet, 3.1 requires separate first_name and
 last_name fields.
+
+Business::OnlinePayment::AuthorizeNet uses the ADC direct response method,
+and sends a username and password with every transaction.  Therefore,
+Authorize.Net's referrer "security" is not necessary.  In your Authorize.Net
+interface at https://secure.authorize.net/ make sure the list of allowable
+referers is blank.  Alternatively, set the B<referer> field in the transaction
+content.
 
 To settle an authorization-only transaction (where you set action to
 'Authorization Only'), submit the nine-digit transaction id code in
@@ -258,6 +293,10 @@ Ivan Kohler <ivan-authorizenet@420.am> updated it for Authorize.Net protocol
 Jason Spence <jspence@lightconsulting.com> contributed support for separate
 Authorization Only and Post Authorization steps and wrote some docs.
 OST <services@ostel.com> paid for it.
+
+T.J. Mather <tjmather@maxmind.com> sent a patch for the CVV2 field.
+
+Mike Barry <mbarry@cos.com> sent in a patch for the referer field.
 
 =head1 SEE ALSO
 
