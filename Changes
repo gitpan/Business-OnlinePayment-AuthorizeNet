@@ -1,5 +1,15 @@
 Revision history for Perl extension Business::OnlinePayment::AuthorizeNet.
 
+3.14  Tue Sep 21 01:10:46 PDT 2004
+	- Added ship_ name/address fields
+	- Fixed required fields for echeck voiding
+	From T.J. Mather <tjmather@maxmind.com> (closes: cpan#6761):
+	- Added cvv2_response and cavv_response to get the cvv2 and cavv
+	  response codes back from authorize.net.
+	- Added example of how to capture a transaction to the synopsis.
+	- Added example of how to get the avs_code, cvv2_response, and
+	  cavv_response from the response
+
 3.13  Sun Aug 10 21:56:34 PDT 2003
 	- removed Michael Mavroudis's email address
 	- added 'void' action, patch from Yuri V. Mkrtumyan

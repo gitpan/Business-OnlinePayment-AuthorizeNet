@@ -12,7 +12,7 @@ require Exporter;
 @ISA = qw(Exporter AutoLoader Business::OnlinePayment);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.13';
+$VERSION = '3.14';
 
 sub set_defaults {
     my $self = shift;
@@ -21,7 +21,9 @@ sub set_defaults {
     $self->port('443');
     $self->path('/gateway/transact.dll');
 
-    $self->build_subs(qw(order_number md5 avs_code));
+    $self->build_subs(qw( order_number md5 avs_code cvv2_response
+                          cavv_response
+                     ));
 }
 
 sub map_fields {
@@ -80,87 +82,112 @@ sub submit {
 
     $self->map_fields();
     $self->remap_fields(
-        type           => 'x_Method',
-        login          => 'x_Login',
-        password       => 'x_Password',
-        transaction_key       => 'x_Tran_Key',
-        action         => 'x_Type',
-        description    => 'x_Description',
-        amount         => 'x_Amount',
-        currency       => 'x_Currency_Code',
-        invoice_number => 'x_Invoice_Num',
-	order_number   => 'x_Trans_ID',
-	auth_code      => 'x_Auth_Code',
-        customer_id    => 'x_Cust_ID',
-        customer_ip    => 'x_Customer_IP',
-        last_name      => 'x_Last_Name',
-        first_name     => 'x_First_Name',
-        address        => 'x_Address',
-        city           => 'x_City',
-        state          => 'x_State',
-        zip            => 'x_Zip',
-        country        => 'x_Country',
-        phone          => 'x_Phone',
-        fax            => 'x_Fax',
-        email          => 'x_Email',
-        company        => 'x_Company',
-        card_number    => 'x_Card_Num',
-        expiration     => 'x_Exp_Date',
-        cvv2           => 'x_Card_Code',
-        check_type     => 'x_Echeck_Type',
-	account_name   => 'x_Bank_Acct_Name',
-        account_number => 'x_Bank_Acct_Num',
-        account_type   => 'x_Bank_Acct_Type',
-        bank_name      => 'x_Bank_Name',
-        routing_code   => 'x_Bank_ABA_Code',
-        customer_org   => 'x_Customer_Organization_Type', 
-        customer_ssn   => 'x_Customer_Tax_ID',
-        license_num    => 'x_Drivers_License_Num',
-        license_state  => 'x_Drivers_License_State',
-        license_dob    => 'x_Drivers_License_DOB',
-        recurring_billing    => 'x_Recurring_Billing',
+        type              => 'x_Method',
+        login             => 'x_Login',
+        password          => 'x_Password',
+        transaction_key   => 'x_Tran_Key',
+        action            => 'x_Type',
+        description       => 'x_Description',
+        amount            => 'x_Amount',
+        currency          => 'x_Currency_Code',
+        invoice_number    => 'x_Invoice_Num',
+	order_number      => 'x_Trans_ID',
+	auth_code         => 'x_Auth_Code',
+        customer_id       => 'x_Cust_ID',
+        customer_ip       => 'x_Customer_IP',
+        last_name         => 'x_Last_Name',
+        first_name        => 'x_First_Name',
+        company           => 'x_Company',
+        address           => 'x_Address',
+        city              => 'x_City',
+        state             => 'x_State',
+        zip               => 'x_Zip',
+        country           => 'x_Country',
+        ship_last_name    => 'x_Ship_To_Last_Name',
+        ship_first_name   => 'x_Ship_To_First_Name',
+        ship_company      => 'x_Company',
+        ship_address      => 'x_Ship_To_Address',
+        ship_city         => 'x_Ship_To_City',
+        ship_state        => 'x_Ship_To_State',
+        ship_zip          => 'x_Ship_To_Zip',
+        ship_country      => 'x_Ship_To_Country',
+        phone             => 'x_Phone',
+        fax               => 'x_Fax',
+        email             => 'x_Email',
+        card_number       => 'x_Card_Num',
+        expiration        => 'x_Exp_Date',
+        cvv2              => 'x_Card_Code',
+        check_type        => 'x_Echeck_Type',
+	account_name      => 'x_Bank_Acct_Name',
+        account_number    => 'x_Bank_Acct_Num',
+        account_type      => 'x_Bank_Acct_Type',
+        bank_name         => 'x_Bank_Name',
+        routing_code      => 'x_Bank_ABA_Code',
+        customer_org      => 'x_Customer_Organization_Type', 
+        customer_ssn      => 'x_Customer_Tax_ID',
+        license_num       => 'x_Drivers_License_Num',
+        license_state     => 'x_Drivers_License_State',
+        license_dob       => 'x_Drivers_License_DOB',
+        recurring_billing => 'x_Recurring_Billing',
     );
-    my $auth_type = $self->{_content}->{transaction_key}?'transaction_key':'password';
 
-    if ($self->transaction_type() eq "ECHECK") {
+    my $auth_type = $self->{_content}->{transaction_key}
+                      ? 'transaction_key'
+                      : 'password';
+
+    my @required_fields = ( qw(type action login), $auth_type );
+
+    unless ( $self->{_content}->{action} eq 'VOID' ) {
+
+      if ($self->transaction_type() eq "ECHECK") {
+
+        push @required_fields, qw(
+          amount routing_code account_number account_type bank_name
+          account_name account_type
+        );
+
         if ($self->{_content}->{customer_org} ne '') {
-            $self->required_fields(qw/type login amount routing_code
-                                  account_number account_type bank_name
-                                  account_name account_type
-                                  customer_org customer_ssn/, $auth_type);
+          push @required_fields, qw( customer_org customer_ssn );
         } else {
-            $self->required_fields(qw/type login amount routing_code
-                                  account_number account_type bank_name
-                                  account_name account_type
-                                  license_num license_state license_dob/, $auth_type);
+          push @required_fields, qw(license_num license_state license_dob);
         }
-    } elsif ($self->transaction_type() eq 'CC' ) {
-      if ( $self->{_content}->{action} eq 'PRIOR_AUTH_CAPTURE' ) {
-          if ( $self->{_content}->{order_number}) {
-              $self->required_fields(qw/type login action amount/, $auth_type);
+
+      } elsif ($self->transaction_type() eq 'CC' ) {
+
+        if ( $self->{_content}->{action} eq 'PRIOR_AUTH_CAPTURE' ) {
+          if ( $self->{_content}->{order_number} ) {
+            push @required_fields, qw( amount order_number );
           } else {
-              $self->required_fields(qw/type login action amount 
-                                        card_number expiration/, $auth_type);
+            push @required_fields, qw( amount card_number expiration );
           }
-      } elsif ( $self->{_content}->{action} eq 'VOID' ) {
-        $self->required_fields(qw/login action/,$auth_type);
+        } else {
+          push @required_fields, qw(
+            amount last_name first_name card_number expiration
+          );
+        }
       } else {
-        $self->required_fields(qw/type login action amount last_name
-                                  first_name card_number expiration/, $auth_type);
+        Carp::croak( "AuthorizeNet can't handle transaction type: ".
+                     $self->transaction_type() );
       }
-    } else {
-        Carp::croak("AuthorizeNet can't handle transaction type: ".
-                    $self->transaction_type());
+
     }
 
-    my %post_data = $self->get_fields(qw/x_Login x_Password x_Tran_Key x_Invoice_Num
+    $self->required_fields(@required_fields);
+
+    my %post_data = $self->get_fields(qw/
+        x_Login x_Password x_Tran_Key x_Invoice_Num
         x_Description x_Amount x_Cust_ID x_Method x_Type x_Card_Num x_Exp_Date
         x_Card_Code x_Auth_Code x_Echeck_Type x_Bank_Acct_Num
         x_Bank_Account_Name x_Bank_ABA_Code x_Bank_Name x_Bank_Acct_Type
         x_Customer_Organization_Type x_Customer_Tax_ID x_Customer_IP
         x_Drivers_License_Num x_Drivers_License_State x_Drivers_License_DOB
-        x_Last_Name x_First_Name x_Address x_City x_State x_Zip x_Country
-        x_Phone x_Fax x_Email x_Email_Customer x_Company x_Country
+        x_Last_Name x_First_Name x_Company
+        x_Address x_City x_State x_Zip
+        x_Country
+        x_Ship_To_Last_Name x_Ship_To_First_Name x_Ship_To_Company
+        x_Ship_To_Address x_Ship_To_City x_Ship_To_State x_Ship_To_Zip
+        x_Ship_To_Country
+        x_Phone x_Fax x_Email x_Email_Customer x_Country
         x_Currency_Code x_Trans_ID/);
     $post_data{'x_Test_Request'} = $self->test_transaction()?"TRUE":"FALSE";
     $post_data{'x_ADC_Delim_Data'} = 'TRUE';
@@ -184,6 +211,9 @@ sub submit {
     $self->avs_code($col[5]);
     $self->order_number($col[6]);
     $self->md5($col[37]);
+    $self->cvv2_response($col[38]);
+    $self->cavv_response($col[39]);
+
     if($col[0] eq "1" ) { # Authorized/Pending/Test
         $self->is_success(1);
         $self->result_code($col[0]);
@@ -216,6 +246,10 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
 
   use Business::OnlinePayment;
 
+  ####
+  # One step transaction, the simple case.
+  ####
+
   my $tx = new Business::OnlinePayment("AuthorizeNet");
   $tx->content(
       type           => 'VISA',
@@ -245,9 +279,72 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
       print "Card was rejected: ".$tx->error_message."\n";
   }
 
+  ####
+  # Two step transaction, authorization and capture.
+  # If you don't need to review order before capture, you can
+  # process in one step as above.
+  ####
+
+  my $tx = new Business::OnlinePayment("AuthorizeNet");
+  $tx->content(
+      type           => 'VISA',
+      login          => 'testdrive',
+      password       => '',
+      action         => 'Authorization Only',
+      description    => 'Business::OnlinePayment test',
+      amount         => '49.95',
+      invoice_number => '100100',
+      customer_id    => 'jsk',
+      first_name     => 'Jason',
+      last_name      => 'Kohles',
+      address        => '123 Anystreet',
+      city           => 'Anywhere',
+      state          => 'UT',
+      zip            => '84058',
+      card_number    => '4007000000027',
+      expiration     => '09/02',
+      cvv2           => '1234', #optional
+      referer        => 'http://valid.referer.url/',
+  );
+  $tx->submit();
+
+  if($tx->is_success()) {
+      # get information about authorization
+      $authorization = $tx->authorization
+      $ordernum = $tx->order_number;
+      $avs_code = $tx->avs_code; # AVS Response Code
+      $cvv2_response = $tx->cvv2_response; # CVV2/CVC2/CID Response Code
+      $cavv_response = $tx->cavv_response; # Cardholder Authentication
+                                           # Verification Value (CAVV) Response
+                                           # Code
+
+      # now capture transaction
+      my $capture = new Business::OnlinePayment("AuthorizeNet");
+
+      $capture->content(
+          type           => 'CC',
+          action         => 'Post Authorization',
+          login          => 'YOURLOGIN
+          password       => 'YOURPASSWORD',
+          order_number   => $ordernum,
+          amount         => '49.95',
+      );
+
+      $capture->submit();
+
+      if($capture->is_success()) { 
+          print "Card captured successfully: ".$capture->authorization."\n";
+      } else {
+          print "Card was rejected: ".$capture->error_message."\n";
+      }
+
+  } else {
+      print "Card was rejected: ".$tx->error_message."\n";
+  }
+
 =head1 SUPPORTED TRANSACTION TYPES
 
-=head2 Visa, MasterCard, American Express, Discover
+=head2 CC, Visa, MasterCard, American Express, Discover
 
 Content required: type, login, password|transaction_key, action, amount, first_name, last_name, card_number, expiration.
 
@@ -305,7 +402,7 @@ Jason Spence <jspence@lightconsulting.com> contributed support for separate
 Authorization Only and Post Authorization steps and wrote some docs.
 OST <services@ostel.com> paid for it.
 
-T.J. Mather <tjmather@maxmind.com> sent a patch for the CVV2 field.
+T.J. Mather <tjmather@maxmind.com> sent a number of CVV2 patches.
 
 Mike Barry <mbarry@cos.com> sent in a patch for the referer field.
 
