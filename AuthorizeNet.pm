@@ -1,6 +1,6 @@
 package Business::OnlinePayment::AuthorizeNet;
 
-# $Id: AuthorizeNet.pm,v 1.7 1999/07/28 01:01:51 robobob Exp $
+# $Id: AuthorizeNet.pm,v 1.10 1999/10/01 18:29:05 robobob Exp $
 
 use strict;
 use Business::OnlinePayment;
@@ -15,7 +15,7 @@ require Exporter;
 # names by default without a very good reason. Use EXPORT_OK instead.
 # Do not simply export all your public functions/methods/constants.
 @EXPORT = qw();
-( $VERSION ) = '$Revision: 1.7 $ ' =~ /\$Revision:\s+([^\s]+)/;
+( $VERSION ) = '$Revision: 1.10 $ ' =~ /\$Revision:\s+([^\s]+)/;
 
 # Preloaded methods go here.
 
@@ -74,29 +74,34 @@ sub submit {
         zip            => 'ZIP',
         card_number    => 'CARDNUM',
         expiration     => 'EXPDATE',
+        account_number => 'ACCTNO',
+        routing_code   => 'ABACODE',
+        bank_name      => 'BANKNAME',
+        country        => 'COUNTRY',
+        phone          => 'PHONE',
+        fax            => 'FAX',
+        email          => 'EMAIL',
     );
 
     if($self->transaction_type() eq "CHECK") {
-        Carp::croak("AuthorizeNet can't (yet) handle CHECK transactions, unfinished");
+        $self->required_fields(qw/type login password action amount name
+                                  account_number routing_code bank_name/);
     } elsif($self->transaction_type() =~ /^VISA|MASTERCARD|AMEX|DISCOVER$/) {
         $self->required_fields(qw/type login password action amount name
-                                  address city state zip card_number
-                                  expiration/);
+                                  card_number expiration/);
     } else {
         Carp::croak("AuthorizeNet can't handle transaction type: ".
                     $self->transaction_type());
     }
 
-    my %post_data;
-    my %content = $self->content();
-
-    foreach(qw/LOGIN PASSWORD INVOICE DESCRIPTION AMOUNT CUSTID METHOD TYPE
-               CARDNUM EXPDATE AUTHCODE ACCTNO ABACODE BANKNAME NAME ADDRESS
-               CITY STATE ZIP COUNTRY PHONE FAX EMAIL EMAILCUSTOMER USER1 USER2
-               USER3 USER4 USER5 USER6 USER7 USER8 USER9 USER10/) {
-        if(exists($content{$_})) { $post_data{$_} = $content{$_}; }
-    }
-
+    my %post_data = $self->get_fields(qw/LOGIN PASSWORD INVOICE DESCRIPTION
+                                         AMOUNT CUSTID METHOD TYPE CARDNUM
+                                         EXPDATE AUTHCODE ACCTNO ABACODE
+                                         BANKNAME NAME ADDRESS CITY STATE
+                                         ZIP COUNTRY PHONE FAX EMAIL
+                                         EMAILCUSTOMER USER1 USER2 USER3
+                                         USER4 USER5 USER6 USER7 USER8
+                                         USER9 USER10/); 
     $post_data{'TESTREQUEST'} = $self->test_transaction()?"TRUE":"FALSE";
     $post_data{'REJECTAVSMISMATCH'} = $self->require_avs()?"TRUE":"FALSE";
     $post_data{'ECHODATA'} = "TRUE";
@@ -161,6 +166,16 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
   } else {
       print "Card was rejected: ".$tx->error_message."\n";
   }
+
+=head1 SUPPORTED TRANSACTION TYPES
+
+=head2 Visa, MasterCard, American Express, Discover
+
+Content required: type, login, password, action, amount, name, card_number, expiration.
+
+=head2 Check
+
+Content required: type, login, password, action, amount, name, account_number, routing_code, bank_name.
 
 =head1 DESCRIPTION
 
