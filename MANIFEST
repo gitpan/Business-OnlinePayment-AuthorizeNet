@@ -8,3 +8,6 @@ t/credit_card.t
 t/check.t
 t/bop.t
 t/capture.t
+t/test_account
+t/test_account_ach
+t/lib/test_account.pl

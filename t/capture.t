@@ -1,20 +1,25 @@
-BEGIN { $| = 1; print "1..2\n"; }
+#!/usr/bin/perl -w
 
-#testing/testing is valid and seems to work... (but not for auth + capture)
-print "ok 1 # Skipped: need a valid Authorize.Net login/password to test\n";
-print "ok 2 # Skipped: need a valid Authorize.Net login/password to test\n";
-exit;
+use Test::More;
+require "t/lib/test_account.pl";
 
-use Business::OnlinePayment;
+my($login, $password) = test_account_or_skip();
+plan tests => 4;
 
-my $tx = new Business::OnlinePayment("AuthorizeNet");
+use_ok 'Business::OnlinePayment';
+
+#avoid dup checking in case "make test" is run too close to the last
+my $amount = sprintf('%.2f', rand(100));
+
+my $tx = Business::OnlinePayment->new("AuthorizeNet");
+$tx->server('test.authorize.net');
 $tx->content(
     type           => 'VISA',
-    login          => 'testing',# CHANGE THESE TO TEST
-    password       => 'testing',#
+    login          => $login,
+    password       => $password,
     action         => 'Authorization Only',
     description    => 'Business::OnlinePayment visa test',
-    amount         => '49.95',
+    amount         => $amount,
     invoice_number => '100100',
     customer_id    => 'jsk',
     first_name     => 'Tofu',
@@ -24,41 +29,43 @@ $tx->content(
     state          => 'UT',
     zip            => '84058',
     card_number    => '4007000000027',
-    expiration     => '08/06',
+    expiration     => expiration_date(),
 );
-$tx->test_transaction(1); # test, dont really charge
+
+# don't set test_transaction (using test server though, still a test)
+# as per authorize.net:
+#  "You need to be in Live Mode to get back a transaction ID"
+#$tx->test_transaction(1); # test, dont really charge
+
 $tx->submit();
 
-unless($tx->is_success()) {
-    print "not ok 1\n";
-    print "not ok 2\n";
-} else {
-    my $order_number = $tx->order_number;
-    warn $order_number;
-    print "ok 1\n";
+ok($tx->is_success()) or diag $tx->error_message;
 
-    my $settle_tx = new Business::OnlinePayment("AuthorizeNet");
-    $settle_tx->content(
-      type           => 'VISA',
-      login          => 'testing', # CHANGE THESE TO TEST
-      password       => 'testing', #
-      action         => 'Post Authorization',
-      description    => 'Business::OnlinePayment visa test',
-      amount         => '49.95',
-      invoice_number => '100100',
-      order_number   => '111',
-      card_number    => '4007000000027',
-      expiration     => '08/06',
-    );
+my $auth = $tx->authorization;
 
-    $settle_tx->test_transaction(1); # test, dont really charge
-    $settle_tx->submit();
+my $order_number = $tx->order_number;
+like $order_number, qr/^\d+$/;
 
-    if($settle_tx->is_success()) {
-        print "ok 2\n";
-    } else {
-        warn $settle_tx->error_message;
-        print "not ok 2\n";
-    }
+#warn "auth: $auth\n";
+#warn "order_number: $order_number\n";
 
-}
+my $settle_tx = Business::OnlinePayment->new("AuthorizeNet");
+$settle_tx->server('test.authorize.net');
+$settle_tx->content(
+    type           => 'VISA',
+    login          => $login,
+    password       => $password,
+    action         => 'Post Authorization',
+    description    => 'Business::OnlinePayment visa test',
+    amount         => $amount,
+    invoice_number => '100100',
+    authorization  => $auth,
+    order_number   => $order_number,
+    card_number    => '4007000000027',
+    expiration     => expiration_date(),
+);
+
+#$settle_tx->test_transaction(1); # test, dont really charge
+$settle_tx->submit();
+
+ok($settle_tx->is_success()) || diag $settle_tx->error_message;

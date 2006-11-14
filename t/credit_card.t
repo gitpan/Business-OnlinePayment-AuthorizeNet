@@ -1,15 +1,19 @@
-BEGIN { $| = 1; print "1..1\n"; }
+#!/usr/bin/perl -w
 
-#testing/testing is valid and seems to work...
-#print "ok 1 # Skipped: need a valid Authorize.Net login/password to test\n"; exit;
+use Test::More;
+require "t/lib/test_account.pl";
 
-use Business::OnlinePayment;
+my($login, $password) = test_account_or_skip();
+plan tests => 2;
+  
+use_ok 'Business::OnlinePayment';
 
-my $tx = new Business::OnlinePayment("AuthorizeNet");
+my $tx = Business::OnlinePayment->new("AuthorizeNet");
+$tx->server('test.authorize.net');
 $tx->content(
     type           => 'VISA',
-    login          => 'testing',
-    password       => 'testing',
+    login          => $login,
+    password       => $password,
     action         => 'Normal Authorization',
     description    => 'Business::OnlinePayment visa test',
     amount         => '49.95',
@@ -22,14 +26,9 @@ $tx->content(
     state          => 'UT',
     zip            => '84058',
     card_number    => '4007000000027',
-    expiration     => '08/06',
+    expiration     => expiration_date(),
 );
 $tx->test_transaction(1); # test, dont really charge
 $tx->submit();
 
-if($tx->is_success()) {
-    print "ok 1\n";
-} else {
-    #warn $tx->error_message;
-    print "not ok 1\n";
-}
+ok($tx->is_success()) or diag $tx->error_message;

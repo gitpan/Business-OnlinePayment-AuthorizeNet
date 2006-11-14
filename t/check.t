@@ -1,32 +1,39 @@
-BEGIN { $| = 1; print "1..1\n"; }
+#!/usr/bin/perl -w
 
-print "ok 1 # Skipped: testing account won't accept ACH transactions\n"; exit;
+use Test::More;
+require "t/lib/test_account.pl";
 
-use Business::OnlinePayment;
+my($login, $password) = test_account_or_skip('ach');
+plan tests => 2;
 
-# checks are broken it seems
-my $ctx = new Business::OnlinePayment("AuthorizeNet");
+use_ok 'Business::OnlinePayment';
+
+my $ctx = Business::OnlinePayment->new("AuthorizeNet");
+$ctx->server('test.authorize.net');
 $ctx->content(
     type           => 'CHECK',
-    login          => 'testing',
-    password       => 'testing',
+    login          => $login,
+    password       => $password,
     action         => 'Normal Authorization',
     amount         => '49.95',
     invoice_number => '100100',
     customer_id    => 'jsk',
     first_name     => 'Tofu',
     last_name      => 'Beast',
+    account_name   => 'Tofu Beast',
     account_number => '12345',
-    routing_code   => '123456789',
+    routing_code   => '111000025',  # BoA in Texas taken from Wikipedia
     bank_name      => 'First National Test Bank',
+    account_type   => 'Checking',
+    license_num    => '12345678',
+    license_state  => 'OR',
+    license_dob    => '1975-05-21',
 );
 $ctx->test_transaction(1); # test, dont really charge
 $ctx->submit();
 
-print $ctx->is_success()."\n";
+SKIP: {
+    skip $ctx->error_message, 1 if $ctx->result_code == 18;
 
-if($ctx->is_success()) {
-    print "ok 1\n";
-} else {
-    print "not ok 1 (".$ctx->error_message().")\n";
+    ok( $ctx->is_success() ) || diag $ctx->error_message;
 }

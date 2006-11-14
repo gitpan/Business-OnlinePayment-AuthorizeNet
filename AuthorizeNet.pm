@@ -9,10 +9,10 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 
 require Exporter;
 
-@ISA = qw(Exporter AutoLoader Business::OnlinePayment);
+@ISA = qw(Exporter Business::OnlinePayment);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.15';
+$VERSION = '3.16';
 
 sub set_defaults {
     my $self = shift;
@@ -105,7 +105,7 @@ sub submit {
         country           => 'x_Country',
         ship_last_name    => 'x_Ship_To_Last_Name',
         ship_first_name   => 'x_Ship_To_First_Name',
-        ship_company      => 'x_Company',
+        ship_company      => 'x_Ship_To_Company',
         ship_address      => 'x_Ship_To_Address',
         ship_city         => 'x_Ship_To_City',
         ship_state        => 'x_Ship_To_State',
@@ -143,10 +143,12 @@ sub submit {
 
         push @required_fields, qw(
           amount routing_code account_number account_type bank_name
-          account_name account_type
+          account_name
         );
 
-        if ($self->{_content}->{customer_org} ne '') {
+        if (defined $self->{_content}->{customer_org} and
+            length  $self->{_content}->{customer_org}
+        ) {
           push @required_fields, qw( customer_org customer_ssn );
         } else {
           push @required_fields, qw(license_num license_state license_dob);
@@ -360,6 +362,22 @@ Content required: type, login, password|transaction_key, action, amount, first_n
 
 For detailed information see L<Business::OnlinePayment>.
 
+=head1 METHODS AND FUNCTIONS
+
+See L<Business::OnlinePayment> for the complete list. The following methods either override the methods in L<Business::OnlinePayment> or provide additional functions.
+
+=head2 result_code
+
+Returns the response reason code (this is different than the response code).
+
+=head2 error_message
+
+Returns the response reason text.
+
+=head2 server_response
+
+Returns the complete response from the server.
+
 =head1 NOTE
 
 Unlike Business::OnlinePayment or pre-3.0 verisons of
@@ -390,9 +408,9 @@ aren't denied due to a lack of address information.
 
 =head1 COMPATIBILITY
 
-This module implements Authorize.Net's API verison 3.1 using the ADC
-Direct Response method.  See
-https://secure.authorize.net/docs/developersguide.pml for details.
+This module implements Authorize.Net's API verison 3.1 using the Advanced
+Integration Method (AIM), formerly known as ADC Direct Response.  See
+http://www.authorize.net/support/AIM_guide.pdf for details.
 
 =head1 AUTHOR
 
@@ -416,7 +434,7 @@ Paul Zimmer <AuthorizeNetpm@pzimmer.box.bepress.com> sent in a patch for
 card-less post authorizations.
 
 Daemmon Hughes <daemmon@daemmonhughes.com> sent in a patch for "transaction
-key" authentication as well support for the recurring_billing flag and the md5'
+key" authentication as well support for the recurring_billing flag and the md5
 method that returns the MD5 hash which is returned by the gateway.
 
 =head1 SEE ALSO

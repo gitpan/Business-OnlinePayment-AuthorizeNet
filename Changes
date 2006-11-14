@@ -1,5 +1,21 @@
 Revision history for Perl extension Business::OnlinePayment::AuthorizeNet.
 
+3.16  Tue Nov 14 02:35:30 PST 2006
+	- Update link to API docs, now it is called "Advanced Integration
+	  Method (AIM)"
+	- Update test account, separate ACH-capable one
+	- patch to map ship_company properly to x_Ship_To_Company from Mike
+	  Barry <MBarry@cos.com>
+	- Documentation patch from William McKee <WMCKEE@cpan.org>
+	From Michael G. Schwern <MSCHWERN@cpan.org>:
+	- Eliminate inheriting from AutoLoader. We're not using it and it just
+          screws up the error messages.
+        - account_type mentioned twice in the required fields for checks.
+        - Quiet an uninit value warning when customer_org is not set.
+	- Fix t/credit_card.t test to use a date 11 months in the future as
+	  the expiration date, and to print the error message on failure.
+	- Update tests to use Test::More
+
 3.15  Wed Mar 16 01:10:51 PST 2005
 	- Ask for ',' delimiter and '"' quote explicitly to prevent problems
 	  when a merchant has them configured differently.
