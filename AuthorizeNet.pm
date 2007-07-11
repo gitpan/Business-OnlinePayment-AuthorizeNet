@@ -12,7 +12,7 @@ require Exporter;
 @ISA = qw(Exporter Business::OnlinePayment);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.16';
+$VERSION = '3.17';
 
 sub set_defaults {
     my $self = shift;
@@ -49,6 +49,15 @@ sub map_fields {
                 );
     $content{'type'} = $types{lc($content{'type'})} || $content{'type'};
     $self->transaction_type($content{'type'});
+
+    # ACCOUNT TYPE MAP
+    my %account_types = ('personal checking'   => 'CHECKING',
+                         'personal savings'    => 'SAVINGS',
+                         'business checking'   => 'CHECKING',
+                         'business savings'    => 'SAVINGS',
+                        );
+    $content{'account_type'} = $account_types{lc($content{'account_type'})}
+                               || $content{'account_type'};
 
     $content{'referer'} = defined( $content{'referer'} )
                             ? make_headers( 'Referer' => $content{'referer'} )
@@ -208,6 +217,9 @@ sub submit {
     my($page,$server_response,%headers) = post_https($s,$p,$t,$r,$pd);
     #escape NULL (binary 0x00) values
     $page =~ s/\x00/\^0/g;
+
+    #trim 'ip_addr="1.2.3.4"' added by eProcessingNetwork Authorize.Net compat
+    $page =~ s/,ip_addr="[\d\.]+"$//;
 
     my $csv = new Text::CSV_XS({ 'binary'=>1 });
     $csv->parse($page);

@@ -1,5 +1,10 @@
 Revision history for Perl extension Business::OnlinePayment::AuthorizeNet.
 
+3.17  Tue Jul 10 21:12:46 PDT 2007
+        - Trim the extra 'ip_addr="1.2.3.4"' added by eProcessingNetwork's
+          AuthorizetNet compatability mode.
+        - add bank account type handling
+
 3.16  Tue Nov 14 02:35:30 PST 2006
 	- Update link to API docs, now it is called "Advanced Integration
 	  Method (AIM)"
