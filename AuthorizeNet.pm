@@ -3,254 +3,43 @@ package Business::OnlinePayment::AuthorizeNet;
 use strict;
 use Carp;
 use Business::OnlinePayment;
-use Net::SSLeay qw/make_form post_https make_headers/;
-use Text::CSV_XS;
-use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
+use vars qw($VERSION @ISA $me);
 
-require Exporter;
-
-@ISA = qw(Exporter Business::OnlinePayment);
-@EXPORT = qw();
-@EXPORT_OK = qw();
-$VERSION = '3.17';
+@ISA = qw(Business::OnlinePayment);
+$VERSION = '3.19';
+$me = 'Business::OnlinePayment::AuthorizeNet';
 
 sub set_defaults {
     my $self = shift;
-
-    $self->server('secure.authorize.net');
-    $self->port('443');
-    $self->path('/gateway/transact.dll');
 
     $self->build_subs(qw( order_number md5 avs_code cvv2_response
                           cavv_response
                      ));
 }
 
-sub map_fields {
+sub _map_processor {
     my($self) = @_;
 
     my %content = $self->content();
-
-    # ACTION MAP
-    my %actions = ('normal authorization' => 'AUTH_CAPTURE',
-                   'authorization only'   => 'AUTH_ONLY',
-                   'credit'               => 'CREDIT',
-                   'post authorization'   => 'PRIOR_AUTH_CAPTURE',
-                   'void'                 => 'VOID',
-                  );
-    $content{'action'} = $actions{lc($content{'action'})} || $content{'action'};
-
-    # TYPE MAP
-    my %types = ('visa'               => 'CC',
-                 'mastercard'         => 'CC',
-                 'american express'   => 'CC',
-                 'discover'           => 'CC',
-                 'check'              => 'ECHECK',
-                );
-    $content{'type'} = $types{lc($content{'type'})} || $content{'type'};
-    $self->transaction_type($content{'type'});
-
-    # ACCOUNT TYPE MAP
-    my %account_types = ('personal checking'   => 'CHECKING',
-                         'personal savings'    => 'SAVINGS',
-                         'business checking'   => 'CHECKING',
-                         'business savings'    => 'SAVINGS',
-                        );
-    $content{'account_type'} = $account_types{lc($content{'account_type'})}
-                               || $content{'account_type'};
-
-    $content{'referer'} = defined( $content{'referer'} )
-                            ? make_headers( 'Referer' => $content{'referer'} )
-                            : "";
-
-    # stuff it back into %content
-    $self->content(%content);
-}
-
-sub remap_fields {
-    my($self,%map) = @_;
-
-    my %content = $self->content();
-    foreach(keys %map) {
-        $content{$map{$_}} = $content{$_};
-    }
-    $self->content(%content);
-}
-
-sub get_fields {
-    my($self,@fields) = @_;
-
-    my %content = $self->content();
-    my %new = ();
-    foreach( grep defined $content{$_}, @fields) { $new{$_} = $content{$_}; }
-    return %new;
+    my %processors = ('recurring authorization'          => 'ARB',
+                      'modify recurring authorization'   => 'ARB',
+                      'cancel recurring authorization'   => 'ARB',
+                     );
+    $processors{lc($content{'action'})} || 'AIM';
 }
 
 sub submit {
     my($self) = @_;
 
-    $self->map_fields();
-    $self->remap_fields(
-        type              => 'x_Method',
-        login             => 'x_Login',
-        password          => 'x_Password',
-        transaction_key   => 'x_Tran_Key',
-        action            => 'x_Type',
-        description       => 'x_Description',
-        amount            => 'x_Amount',
-        currency          => 'x_Currency_Code',
-        invoice_number    => 'x_Invoice_Num',
-	order_number      => 'x_Trans_ID',
-	auth_code         => 'x_Auth_Code',
-        customer_id       => 'x_Cust_ID',
-        customer_ip       => 'x_Customer_IP',
-        last_name         => 'x_Last_Name',
-        first_name        => 'x_First_Name',
-        company           => 'x_Company',
-        address           => 'x_Address',
-        city              => 'x_City',
-        state             => 'x_State',
-        zip               => 'x_Zip',
-        country           => 'x_Country',
-        ship_last_name    => 'x_Ship_To_Last_Name',
-        ship_first_name   => 'x_Ship_To_First_Name',
-        ship_company      => 'x_Ship_To_Company',
-        ship_address      => 'x_Ship_To_Address',
-        ship_city         => 'x_Ship_To_City',
-        ship_state        => 'x_Ship_To_State',
-        ship_zip          => 'x_Ship_To_Zip',
-        ship_country      => 'x_Ship_To_Country',
-        phone             => 'x_Phone',
-        fax               => 'x_Fax',
-        email             => 'x_Email',
-        card_number       => 'x_Card_Num',
-        expiration        => 'x_Exp_Date',
-        cvv2              => 'x_Card_Code',
-        check_type        => 'x_Echeck_Type',
-	account_name      => 'x_Bank_Acct_Name',
-        account_number    => 'x_Bank_Acct_Num',
-        account_type      => 'x_Bank_Acct_Type',
-        bank_name         => 'x_Bank_Name',
-        routing_code      => 'x_Bank_ABA_Code',
-        customer_org      => 'x_Customer_Organization_Type', 
-        customer_ssn      => 'x_Customer_Tax_ID',
-        license_num       => 'x_Drivers_License_Num',
-        license_state     => 'x_Drivers_License_State',
-        license_dob       => 'x_Drivers_License_DOB',
-        recurring_billing => 'x_Recurring_Billing',
-    );
+    my $processor = $me. "::". $self->_map_processor();
 
-    my $auth_type = $self->{_content}->{transaction_key}
-                      ? 'transaction_key'
-                      : 'password';
-
-    my @required_fields = ( qw(type action login), $auth_type );
-
-    unless ( $self->{_content}->{action} eq 'VOID' ) {
-
-      if ($self->transaction_type() eq "ECHECK") {
-
-        push @required_fields, qw(
-          amount routing_code account_number account_type bank_name
-          account_name
-        );
-
-        if (defined $self->{_content}->{customer_org} and
-            length  $self->{_content}->{customer_org}
-        ) {
-          push @required_fields, qw( customer_org customer_ssn );
-        } else {
-          push @required_fields, qw(license_num license_state license_dob);
-        }
-
-      } elsif ($self->transaction_type() eq 'CC' ) {
-
-        if ( $self->{_content}->{action} eq 'PRIOR_AUTH_CAPTURE' ) {
-          if ( $self->{_content}->{order_number} ) {
-            push @required_fields, qw( amount order_number );
-          } else {
-            push @required_fields, qw( amount card_number expiration );
-          }
-        } elsif ( $self->{_content}->{action} eq 'CREDIT' ) {
-          push @required_fields, qw( amount order_number card_number );
-        } else {
-          push @required_fields, qw(
-            amount last_name first_name card_number expiration
-          );
-        }
-      } else {
-        Carp::croak( "AuthorizeNet can't handle transaction type: ".
-                     $self->transaction_type() );
-      }
-
-    }
-
-    $self->required_fields(@required_fields);
-
-    my %post_data = $self->get_fields(qw/
-        x_Login x_Password x_Tran_Key x_Invoice_Num
-        x_Description x_Amount x_Cust_ID x_Method x_Type x_Card_Num x_Exp_Date
-        x_Card_Code x_Auth_Code x_Echeck_Type x_Bank_Acct_Num
-        x_Bank_Account_Name x_Bank_ABA_Code x_Bank_Name x_Bank_Acct_Type
-        x_Customer_Organization_Type x_Customer_Tax_ID x_Customer_IP
-        x_Drivers_License_Num x_Drivers_License_State x_Drivers_License_DOB
-        x_Last_Name x_First_Name x_Company
-        x_Address x_City x_State x_Zip
-        x_Country
-        x_Ship_To_Last_Name x_Ship_To_First_Name x_Ship_To_Company
-        x_Ship_To_Address x_Ship_To_City x_Ship_To_State x_Ship_To_Zip
-        x_Ship_To_Country
-        x_Phone x_Fax x_Email x_Email_Customer x_Country
-        x_Currency_Code x_Trans_ID/);
-    $post_data{'x_Test_Request'} = $self->test_transaction()?"TRUE":"FALSE";
-    $post_data{'x_ADC_Delim_Data'} = 'TRUE';
-    $post_data{'x_delim_char'} = ',';
-    $post_data{'x_encap_char'} = '"';
-    $post_data{'x_ADC_URL'} = 'FALSE';
-    $post_data{'x_Version'} = '3.1';
-
-    my $pd = make_form(%post_data);
-    my $s = $self->server();
-    my $p = $self->port();
-    my $t = $self->path();
-    my $r = $self->{_content}->{referer};
-    my($page,$server_response,%headers) = post_https($s,$p,$t,$r,$pd);
-    #escape NULL (binary 0x00) values
-    $page =~ s/\x00/\^0/g;
-
-    #trim 'ip_addr="1.2.3.4"' added by eProcessingNetwork Authorize.Net compat
-    $page =~ s/,ip_addr="[\d\.]+"$//;
-
-    my $csv = new Text::CSV_XS({ 'binary'=>1 });
-    $csv->parse($page);
-    my @col = $csv->fields();
-
-    $self->server_response($page);
-    $self->avs_code($col[5]);
-    $self->order_number($col[6]);
-    $self->md5($col[37]);
-    $self->cvv2_response($col[38]);
-    $self->cavv_response($col[39]);
-
-    if($col[0] eq "1" ) { # Authorized/Pending/Test
-        $self->is_success(1);
-        $self->result_code($col[0]);
-        $self->authorization($col[4]);
-    } else {
-        $self->is_success(0);
-        $self->result_code($col[2]);
-        $self->error_message($col[3]);
-        unless ( $self->result_code() ) { #additional logging information
-          #$page =~ s/\x00/\^0/g;
-          $self->error_message($col[3].
-            " DEBUG: No x_response_code from server, ".
-            "(HTTPS response: $server_response) ".
-            "(HTTPS headers: ".
-              join(", ", map { "$_ => ". $headers{$_} } keys %headers ). ") ".
-            "(Raw HTTPS content: $page)"
-          );
-        }
-    }
+    eval "use $processor";
+    croak("unknown processor $processor ($@)") if $@;
+    
+    my $object = bless $self, $processor;
+    $object->set_defaults();
+    $object->submit();
+    bless $self, $me;
 }
 
 1;
@@ -272,7 +61,7 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
   $tx->content(
       type           => 'VISA',
       login          => 'testdrive',
-      password       => '',
+      password       => '', #password or transaction key
       action         => 'Normal Authorization',
       description    => 'Business::OnlinePayment test',
       amount         => '49.95',
@@ -307,7 +96,7 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
   $tx->content(
       type           => 'VISA',
       login          => 'testdrive',
-      password       => '',
+      password       => '',  #password or transaction key
       action         => 'Authorization Only',
       description    => 'Business::OnlinePayment test',
       amount         => '49.95',
@@ -360,6 +149,98 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
       print "Card was rejected: ".$tx->error_message."\n";
   }
 
+  ####
+  # One step subscription, the simple case.
+  ####
+
+  my $tx = new Business::OnlinePayment("AuthorizeNet::ARB");
+  $tx->content(
+      type           => 'CC',
+      login          => 'testdrive',
+      password       => 'testpass',
+      action         => 'Recurring Authorization',
+      interval       => '7 days',
+      start          => '2008-3-10',
+      periods        => '16',
+      amount         => '99.95',
+      trialperiods   => '4',
+      trialamount    => '0',
+      description    => 'Business::OnlinePayment test',
+      invoice_number => '1153B33F',
+      customer_id    => 'vip',
+      first_name     => 'Tofu',
+      last_name      => 'Beast',
+      address        => '123 Anystreet',
+      city           => 'Anywhere',
+      state          => 'GA',
+      zip            => '84058',
+      card_number    => '4111111111111111',
+      expiration     => '09/02',
+  );
+  $tx->submit();
+
+  if($tx->is_success()) {
+      print "Card processed successfully: ".$tx->order_number."\n";
+  } else {
+      print "Card was rejected: ".$tx->error_message."\n";
+  }
+  my $subscription = $tx->order_number
+
+
+  ####
+  # Subscription change.   Modestly more complicated.
+  ####
+
+  $tx->content(
+      type           => 'CC',
+      subscription   => '99W2C',
+      login          => 'testdrive',
+      password       => 'testpass',
+      action         => 'Modify Recurring Authorization',
+      interval       => '7 days',
+      start          => '2008-3-10',
+      periods        => '16',
+      amount         => '29.95',
+      trialperiods   => '4',
+      trialamount    => '0',
+      description    => 'Business::OnlinePayment test',
+      invoice_number => '1153B340',
+      customer_id    => 'vip',
+      first_name     => 'Tofu',
+      last_name      => 'Beast',
+      address        => '123 Anystreet',
+      city           => 'Anywhere',
+      state          => 'GA',
+      zip            => '84058',
+      card_number    => '4111111111111111',
+      expiration     => '09/02',
+  );
+  $tx->submit();
+
+  if($tx->is_success()) {
+      print "Update processed successfully."\n";
+  } else {
+      print "Update was rejected: ".$tx->error_message."\n";
+  }
+  $tx->content(
+      subscription   => '99W2D',
+      login          => 'testdrive',
+      password       => 'testpass',
+      action         => 'Cancel Recurring Authorization',
+  );
+  $tx->submit();
+
+  ####
+  # Subscription cancellation.   It happens.
+  ####
+
+  if($tx->is_success()) {
+      print "Cancellation processed successfully."\n";
+  } else {
+      print "Cancellation was rejected: ".$tx->error_message."\n";
+  }
+
+
 =head1 SUPPORTED TRANSACTION TYPES
 
 =head2 CC, Visa, MasterCard, American Express, Discover
@@ -368,7 +249,11 @@ Content required: type, login, password|transaction_key, action, amount, first_n
 
 =head2 Check
 
-Content required: type, login, password|transaction_key, action, amount, first_name, last_name, account_number, routing_code, bank_name.
+Content required: type, login, password|transaction_key, action, amount, first_name, last_name, account_number, routing_code, bank_name (non-subscription), account_type (subscription), check_type (subscription).
+
+=head2 Subscriptions
+
+Additional content required: interval, start, periods.
 
 =head1 DESCRIPTION
 
@@ -376,19 +261,101 @@ For detailed information see L<Business::OnlinePayment>.
 
 =head1 METHODS AND FUNCTIONS
 
-See L<Business::OnlinePayment> for the complete list. The following methods either override the methods in L<Business::OnlinePayment> or provide additional functions.
+See L<Business::OnlinePayment> for the complete list. The following methods either override the methods in L<Business::OnlinePayment> or provide additional functions.  
 
 =head2 result_code
 
-Returns the response reason code (this is different than the response code).
+Returns the response reason code (from the message.code field for subscriptions).
 
 =head2 error_message
 
-Returns the response reason text.
+Returns the response reason text (from the message.text field for subscriptions.
 
 =head2 server_response
 
 Returns the complete response from the server.
+
+=head1 Handling of content(%content) data:
+
+=head2 action
+
+The following actions are valid
+
+  normal authorization
+  authorization only
+  credit
+  post authorization
+  void
+  recurring authorization
+  modify recurring authorization
+  cancel recurring authorization
+
+=head2 interval
+
+  Interval contains a number of digits, whitespace, and the units of days or months in either singular or plural form.
+  
+
+=head1 Setting AuthorizeNet ARB parameters from content(%content)
+
+The following rules are applied to map data to AuthorizeNet ARB parameters
+from content(%content):
+
+      # ARB param => $content{<key>}
+      merchantAuthentication
+        name                     =>  'login',
+        transactionKey           =>  'password',
+      subscription
+        paymentSchedule
+          interval
+            length               => \( the digits in 'interval' ),
+            unit                 => \( days or months gleaned from 'interval' ),          startDate              => 'start',
+          totalOccurrences       => 'periods',
+          trialOccurrences       => 'trialperiods',
+        amount                   => 'amount',
+        trialAmount              => 'trialamount',
+        payment
+          creditCard
+            cardNumber           => 'card_number',
+            expiration           => \( $year.'-'.$month ), # YYYY-MM from 'expiration'
+          bankAccount
+            accountType          => 'account_type',
+            routingNumber        => 'routing_code',
+            accountNumber        => 'account_number,
+            nameOnAccount        => 'name',
+            bankName             => 'bank_name',
+            echeckType           => 'check_type',
+        order
+          invoiceNumber          => 'invoice_number',
+          description            => 'description',
+        customer
+          type                   => 'customer_org',
+          id                     => 'customer_id',
+          email                  => 'email',
+          phoneNumber            => 'phone',
+          faxNumber              => 'fax',
+          driversLicense
+            number               => 'license_num',
+            state                => 'license_state',
+            dateOfBirth          => 'license_dob',
+          taxid                  => 'customer_ssn',
+        billTo
+          firstName              => 'first_name',
+          lastName               => 'last_name',
+          company                => 'company',
+          address                => 'address',
+          city                   => 'city',
+          state                  => 'state',
+          zip                    => 'zip',
+          country                => 'country',
+        shipTo
+          firstName              => 'ship_first_name',
+          lastName               => 'ship_last_name',
+          company                => 'ship_company',
+          address                => 'ship_address',
+          city                   => 'ship_city',
+          state                  => 'ship_state',
+          zip                    => 'ship_zip',
+          country                => 'ship_country',
 
 =head1 NOTE
 
@@ -397,8 +364,9 @@ Business::OnlinePayment::AuthorizeNet, 3.1 requires separate first_name and
 last_name fields.
 
 Business::OnlinePayment::AuthorizeNet uses Authorize.Net's "Advanced
-Integration Method (AIM) (formerly known as ADC direct response)", sending a
-username and transaction_key or password with every transaction.  Therefore, Authorize.Net's
+Integration Method (AIM) (formerly known as ADC direct response)" and
+"Automatic Recurring Billing (ARB)", sending a username and transaction_key
+or password with every transaction.  Therefore, Authorize.Net's
 referrer "security" is not necessary.  In your Authorize.Net interface at
 https://secure.authorize.net/ make sure the list of allowable referers is
 blank.  Alternatively, set the B<referer> field in the transaction content.
@@ -411,6 +379,10 @@ order_number method on the object returned from the authorization.
 You must also submit the amount field with a value less than or equal
 to the amount specified in the original authorization.
 
+For the subscription actions an authorization code is never returned by
+the module.  Instead it returns the value of subscriptionId in order_number.
+This is the value to use for changing or cancelling subscriptions.
+
 Recently (February 2002), Authorize.Net has turned address
 verification on by default for all merchants.  If you do not have
 valid address information for your customer (such as in an IVR
@@ -420,9 +392,10 @@ aren't denied due to a lack of address information.
 
 =head1 COMPATIBILITY
 
-This module implements Authorize.Net's API verison 3.1 using the Advanced
-Integration Method (AIM), formerly known as ADC Direct Response.  See
-http://www.authorize.net/support/AIM_guide.pdf for details.
+This module implements Authorize.Net's API using the Advanced Integration
+Method (AIM) version 3.1, formerly known as ADC Direct Response and the 
+Automatic Recurring Billing version 1.0 using the XML interface.  See
+http://www.authorize.net/support/AIM_guide.pdf and http://www.authorize.net/support/ARB_guide.pdf for details.
 
 =head1 AUTHOR
 
@@ -436,6 +409,9 @@ Jason Spence <jspence@lightconsulting.com> contributed support for separate
 Authorization Only and Post Authorization steps and wrote some docs.
 OST <services@ostel.com> paid for it.
 
+Jeff Finucane <authorizenetarb@weasellips.com> added the ARB support.
+ARB support sponsored by Plus Three, LP. L<http://www.plusthree.com>.
+
 T.J. Mather <tjmather@maxmind.com> sent a number of CVV2 patches.
 
 Mike Barry <mbarry@cos.com> sent in a patch for the referer field.
@@ -448,6 +424,9 @@ card-less post authorizations.
 Daemmon Hughes <daemmon@daemmonhughes.com> sent in a patch for "transaction
 key" authentication as well support for the recurring_billing flag and the md5
 method that returns the MD5 hash which is returned by the gateway.
+
+Steve Simitzis contributed a patch for better compatibility with
+eProcessingNetwork's AuthorizeNet compatability mode.
 
 =head1 SEE ALSO
 

@@ -28,4 +28,9 @@ sub expiration_date {
     return sprintf("%02d/%02d", $month, $year);
 }
 
+sub tomorrow {
+    my($day, $month, $year) = (localtime(time+86400))[3..5];
+    return sprintf("%04d-%02d-%02d", $year+1900, ++$month, $day);
+}
+
 1;
