@@ -22,6 +22,7 @@ sub test_account {
 
 sub expiration_date {
     my($month, $year) = (localtime)[4,5];
+    $month += 1;
     $year++;       # So we expire next year.
     $year %= 100;  # y2k?  What's that?
 

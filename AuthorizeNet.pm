@@ -6,7 +6,7 @@ use Business::OnlinePayment;
 use vars qw($VERSION @ISA $me);
 
 @ISA = qw(Business::OnlinePayment);
-$VERSION = '3.19';
+$VERSION = '3.20';
 $me = 'Business::OnlinePayment::AuthorizeNet';
 
 sub set_defaults {

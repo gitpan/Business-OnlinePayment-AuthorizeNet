@@ -27,7 +27,7 @@ $tx->content(
     card_number    => '4007000000027',
     expiration     => expiration_date(),
     interval       => '1 month',
-    start          => '2007-12-01',
+    start          => tomorrow(),
     periods        => '3',
 );
 $tx->test_transaction(1); # test, dont really charge

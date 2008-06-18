@@ -12,7 +12,7 @@ require Exporter;
 @ISA = qw(Exporter Business::OnlinePayment::AuthorizeNet);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.18';
+$VERSION = '3.20';
 
 sub set_defaults {
     my $self = shift;
@@ -137,12 +137,16 @@ sub submit {
         account_type      => 'x_Bank_Acct_Type',
         bank_name         => 'x_Bank_Name',
         routing_code      => 'x_Bank_ABA_Code',
+        check_number      => 'x_Bank_Check_Number',
         customer_org      => 'x_Customer_Organization_Type', 
         customer_ssn      => 'x_Customer_Tax_ID',
         license_num       => 'x_Drivers_License_Num',
         license_state     => 'x_Drivers_License_State',
         license_dob       => 'x_Drivers_License_DOB',
         recurring_billing => 'x_Recurring_Billing',
+        duplicate_window  => 'x_Duplicate_Window',
+        track1            => 'x_Track1',
+        track2            => 'x_Track2',
     );
 
     my $auth_type = $self->{_content}->{transaction_key}
@@ -197,6 +201,7 @@ sub submit {
         x_Description x_Amount x_Cust_ID x_Method x_Type x_Card_Num x_Exp_Date
         x_Card_Code x_Auth_Code x_Echeck_Type x_Bank_Acct_Num
         x_Bank_Account_Name x_Bank_ABA_Code x_Bank_Name x_Bank_Acct_Type
+        x_Bank_Check_Number
         x_Customer_Organization_Type x_Customer_Tax_ID x_Customer_IP
         x_Drivers_License_Num x_Drivers_License_State x_Drivers_License_DOB
         x_Last_Name x_First_Name x_Company
@@ -206,7 +211,7 @@ sub submit {
         x_Ship_To_Address x_Ship_To_City x_Ship_To_State x_Ship_To_Zip
         x_Ship_To_Country
         x_Phone x_Fax x_Email x_Email_Customer x_Country
-        x_Currency_Code x_Trans_ID/);
+        x_Currency_Code x_Trans_ID x_Duplicate_Window x_Track1 x_Track2/);
 
     $post_data{'x_Test_Request'} = $self->test_transaction() ? 'TRUE' : 'FALSE';
 

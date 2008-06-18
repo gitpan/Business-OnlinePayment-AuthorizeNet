@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use Test::More;
+use Test::More skip_all => "Authorize.net test account won't do ACH";
 require "t/lib/test_account.pl";
 
 my($login, $password) = test_account_or_skip('ach');
@@ -34,6 +34,5 @@ $ctx->submit();
 
 SKIP: {
     skip $ctx->error_message, 1 if $ctx->result_code == 18;
-
     ok( $ctx->is_success() ) || diag $ctx->error_message;
 }
