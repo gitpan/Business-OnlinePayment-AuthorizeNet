@@ -12,7 +12,7 @@ require Exporter;
 @ISA = qw(Exporter Business::OnlinePayment::AuthorizeNet);
 @EXPORT = qw();
 @EXPORT_OK = qw();
-$VERSION = '3.20';
+$VERSION = '3.21';
 
 sub set_defaults {
     my $self = shift;
@@ -124,6 +124,11 @@ sub submit {
         ship_state        => 'x_Ship_To_State',
         ship_zip          => 'x_Ship_To_Zip',
         ship_country      => 'x_Ship_To_Country',
+        tax               => 'x_Tax',
+        freight           => 'x_Freight',
+        duty              => 'x_Duty',
+        tax_exempt        => 'x_Tax_Exempt',
+        po_number         => 'x_Po_Num',
         phone             => 'x_Phone',
         fax               => 'x_Fax',
         email             => 'x_Email',
@@ -210,6 +215,7 @@ sub submit {
         x_Ship_To_Last_Name x_Ship_To_First_Name x_Ship_To_Company
         x_Ship_To_Address x_Ship_To_City x_Ship_To_State x_Ship_To_Zip
         x_Ship_To_Country
+        x_Tax x_Freight x_Duty x_Tax_Exempt x_Po_Num
         x_Phone x_Fax x_Email x_Email_Customer x_Country
         x_Currency_Code x_Trans_ID x_Duplicate_Window x_Track1 x_Track2/);
 
@@ -219,13 +225,37 @@ sub submit {
     if (    $post_data{'x_Email_Customer'}
          && $post_data{'x_Email_Customer'} !~ /^FALSE$/i ) {
       $post_data{'x_Email_Customer'} = 'TRUE';
-    } else {
+    } elsif ( exists $post_data{'x_Email_Customer'} ) {
       $post_data{'x_Email_Customer'} = 'FALSE';
+    }
+
+    my $data_string = join("", values %post_data);
+
+    my $encap_character;
+    # The first set of characters here are recommended by authorize.net in their
+    #   encapsulating character example.
+    # The second set we made up hoping they will work if the first fail.
+    # The third chr(31) is the binary 'unit separator' and is our final last
+    #   ditch effort to find something not in the input.
+    foreach my $char( qw( | " ' : ; / \ - * ), '#', qw( ^ + < > [ ] ~), chr(31) ){
+      if( index($data_string, $char) == -1 ){ # found one.
+        $encap_character = $char;
+        last;
+      }
+    }
+
+    if(!$encap_character){
+      $self->is_success(0);
+      $self->error_message(
+			   "DEBUG: Input contains all encapsulating characters."
+			   . " Please remove | or ^ from your input if possible."
+			  );
+      return;
     }
 
     $post_data{'x_ADC_Delim_Data'} = 'TRUE';
     $post_data{'x_delim_char'} = ',';
-    $post_data{'x_encap_char'} = '"';
+    $post_data{'x_encap_char'} = $encap_character;
     $post_data{'x_ADC_URL'} = 'FALSE';
     $post_data{'x_Version'} = '3.1';
 
@@ -241,7 +271,7 @@ sub submit {
     #trim 'ip_addr="1.2.3.4"' added by eProcessingNetwork Authorize.Net compat
     $page =~ s/,ip_addr="[\d\.]+"$//;
 
-    my $csv = new Text::CSV_XS({ binary=>1, escape_char=>'' });
+    my $csv = new Text::CSV_XS({ binary=>1, escape_char=>'', quote_char => $encap_character });
     $csv->parse($page);
     my @col = $csv->fields();
 

@@ -10,7 +10,7 @@ use Tie::IxHash;
 use vars qw($VERSION $DEBUG @ISA $me);
 
 @ISA = qw(Business::OnlinePayment::AuthorizeNet Business::OnlinePayment::HTTPS);
-$VERSION = '0.01';
+$VERSION = '0.02';
 $DEBUG = 0;
 $me='Business::OnlinePayment::AuthorizeNet::ARB';
 
@@ -162,7 +162,6 @@ sub submit {
                           startDate        => 'start',
                           totalOccurrences => 'periods',
                           trialOccurrences => 'trialperiods',
-                          phoneNumber      => 'phone',
                         );
 
   tie my %account, 'Tie::IxHash', ( 
@@ -241,6 +240,7 @@ sub submit {
 
   tie my %sub, 'Tie::IxHash',
     $self->revmap_fields(
+                          name            => 'subscription_name',
                           paymentSchedule => \%schedule,
                           amount          => 'amount',
                           trialAmount     => 'trialamount',

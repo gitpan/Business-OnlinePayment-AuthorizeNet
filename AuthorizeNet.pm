@@ -6,7 +6,7 @@ use Business::OnlinePayment;
 use vars qw($VERSION @ISA $me);
 
 @ISA = qw(Business::OnlinePayment);
-$VERSION = '3.20';
+$VERSION = '3.21';
 $me = 'Business::OnlinePayment::AuthorizeNet';
 
 sub set_defaults {
@@ -132,7 +132,7 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
           type           => 'CC',
           action         => 'Post Authorization',
           login          => 'YOURLOGIN
-          password       => 'YOURPASSWORD',
+          password       => 'YOURPASSWORD', #or transaction key
           order_number   => $ordernum,
           amount         => '49.95',
       );
@@ -157,7 +157,7 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
   $tx->content(
       type           => 'CC',
       login          => 'testdrive',
-      password       => 'testpass',
+      password       => 'testpass', #or transaction key
       action         => 'Recurring Authorization',
       interval       => '7 days',
       start          => '2008-3-10',
@@ -195,7 +195,7 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
       type           => 'CC',
       subscription   => '99W2C',
       login          => 'testdrive',
-      password       => 'testpass',
+      password       => 'testpass', #or transaction key
       action         => 'Modify Recurring Authorization',
       interval       => '7 days',
       start          => '2008-3-10',
@@ -225,7 +225,7 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
   $tx->content(
       subscription   => '99W2D',
       login          => 'testdrive',
-      password       => 'testpass',
+      password       => 'testpass', # or transaction key
       action         => 'Cancel Recurring Authorization',
   );
   $tx->submit();
@@ -245,11 +245,11 @@ Business::OnlinePayment::AuthorizeNet - AuthorizeNet backend for Business::Onlin
 
 =head2 CC, Visa, MasterCard, American Express, Discover
 
-Content required: type, login, password|transaction_key, action, amount, first_name, last_name, card_number, expiration.
+Content required: type, login, password, action, amount, first_name, last_name, card_number, expiration.
 
 =head2 Check
 
-Content required: type, login, password|transaction_key, action, amount, first_name, last_name, account_number, routing_code, bank_name (non-subscription), account_type (subscription), check_type (subscription).
+Content required: type, login, password, action, amount, first_name, last_name, account_number, routing_code, bank_name (non-subscription), account_type (subscription), check_type (subscription).
 
 =head2 Subscriptions
 
@@ -357,7 +357,9 @@ from content(%content):
           zip                    => 'ship_zip',
           country                => 'ship_country',
 
-=head1 NOTE
+=head1 NOTES
+
+Use your transaction key in the password field.
 
 Unlike Business::OnlinePayment or pre-3.0 verisons of
 Business::OnlinePayment::AuthorizeNet, 3.1 requires separate first_name and
@@ -365,11 +367,12 @@ last_name fields.
 
 Business::OnlinePayment::AuthorizeNet uses Authorize.Net's "Advanced
 Integration Method (AIM) (formerly known as ADC direct response)" and
-"Automatic Recurring Billing (ARB)", sending a username and transaction_key
-or password with every transaction.  Therefore, Authorize.Net's
-referrer "security" is not necessary.  In your Authorize.Net interface at
-https://secure.authorize.net/ make sure the list of allowable referers is
-blank.  Alternatively, set the B<referer> field in the transaction content.
+"Automatic Recurring Billing (ARB)", sending a username and password (or
+transaction key as password) with every transaction.  Therefore,
+Authorize.Net's referrer "security" is not necessary.  In your Authorize.Net
+interface at https://secure.authorize.net/ make sure the list of allowable
+referers is blank.  Alternatively, set the B<referer> field in the transaction
+content.
 
 To settle an authorization-only transaction (where you set action to
 'Authorization Only'), submit the nine-digit transaction id code in
@@ -383,11 +386,10 @@ For the subscription actions an authorization code is never returned by
 the module.  Instead it returns the value of subscriptionId in order_number.
 This is the value to use for changing or cancelling subscriptions.
 
-Recently (February 2002), Authorize.Net has turned address
-verification on by default for all merchants.  If you do not have
-valid address information for your customer (such as in an IVR
-application), you must disable address verification in the Merchant
-Menu page at https://secure.authorize.net/ so that the transactions
+Authorize.Net has turned address verification on by default for all merchants
+since 2002.  If you do not have valid address information for your customer
+(such as in an IVR application), you must disable address verification in the
+Merchant Menu page at https://secure.authorize.net/ so that the transactions
 aren't denied due to a lack of address information.
 
 =head1 COMPATIBILITY
@@ -397,13 +399,13 @@ Method (AIM) version 3.1, formerly known as ADC Direct Response and the
 Automatic Recurring Billing version 1.0 using the XML interface.  See
 http://www.authorize.net/support/AIM_guide.pdf and http://www.authorize.net/support/ARB_guide.pdf for details.
 
-=head1 AUTHOR
+=head1 AUTHORS
 
-Jason Kohles, jason@mediabang.com
+Original author: Jason Kohles, jason@mediabang.com
 
-Ivan Kohler <ivan-authorizenet@420.am> updated it for Authorize.Net protocol
-3.0/3.1 and is the current maintainer.  Please send patches as unified diffs
-(diff -u).
+Ivan Kohler <ivan-authorizenet@freeside.biz> updated it for Authorize.Net
+protocol 3.0/3.1 and is the current maintainer.  Please see the next section
+for for information on contributing.
 
 Jason Spence <jspence@lightconsulting.com> contributed support for separate
 Authorization Only and Post Authorization steps and wrote some docs.
@@ -414,7 +416,8 @@ ARB support sponsored by Plus Three, LP. L<http://www.plusthree.com>.
 
 T.J. Mather <tjmather@maxmind.com> sent a number of CVV2 patches.
 
-Mike Barry <mbarry@cos.com> sent in a patch for the referer field.
+Mike Barry <mbarry@cos.com> sent in a patch for the referer field and a fix for
+ship_company.
 
 Yuri V. Mkrtumyan <yuramk@novosoft.ru> sent in a patch to add the void action.
 
@@ -427,6 +430,49 @@ method that returns the MD5 hash which is returned by the gateway.
 
 Steve Simitzis contributed a patch for better compatibility with
 eProcessingNetwork's AuthorizeNet compatability mode.
+
+Michael G. Schwern contributed cleanups, test fixes, and more.
+
+Erik Hollensbe implemented card-present data (track1/track2), the
+duplicate_window parameter, and test fixes.
+
+Paul Timmins added the check_number field.
+
+Nate Nuss implemented the ("Additional Shipping Information (Level 2 Data)"
+fields: tax, freight, duty, tax_exempt, po_number.
+
+Michael Peters fixed a bug in email address handling.
+
+=head1 CONTRIBUTIONS AND REPOSITORY
+
+Please send patches as unified diffs (diff -u) to (in order of preference):
+
+=over 4
+
+=item CPAN RT
+
+http://rt.cpan.org/Public/Bug/Report.html?Queue=Business-OnlinePayment-AuthorizeNet
+
+=item The bop-devel mailing list
+
+http://420.am/cgi-bin/mailman/listinfo/bop-devel
+
+=item Ivan
+
+Ivan Kohler <ivan-authorizenet@freeside.biz>
+
+=back
+
+The code is available from our public CVS repository:
+
+  export CVSROOT=":pserver:anonymous@cvs.freeside.biz:/home/cvs/cvsroot"
+  cvs login
+  # The password for the user `anonymous' is `anonymous'.
+  cvs checkout Business-OnlinePayment-AuthorizeNet
+
+Or on the web:
+
+  http://freeside.biz/cgi-bin/viewvc.cgi/Business-OnlinePayment-AuthorizeNet/
 
 =head1 SEE ALSO
 
