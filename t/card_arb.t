@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use Test::More;
+use Test::More skip_all => 'Authorize.net test account throwing errors about duplicates';
 require "t/lib/test_account.pl";
 
 my($login, $password) = test_account_or_skip('arb');

@@ -2,17 +2,14 @@ package Business::OnlinePayment::AuthorizeNet::AIM;
 
 use strict;
 use Carp;
+use Business::OnlinePayment::HTTPS;
 use Business::OnlinePayment::AuthorizeNet;
-use Net::SSLeay qw/make_form post_https make_headers/;
+use Business::OnlinePayment::AuthorizeNet::AIM::ErrorCodes '%ERRORS';
 use Text::CSV_XS;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 
-require Exporter;
-
-@ISA = qw(Exporter Business::OnlinePayment::AuthorizeNet);
-@EXPORT = qw();
-@EXPORT_OK = qw();
-$VERSION = '3.21';
+@ISA = qw(Business::OnlinePayment::AuthorizeNet Business::OnlinePayment::HTTPS);
+$VERSION = '3.22';
 
 sub set_defaults {
     my $self = shift;
@@ -38,7 +35,7 @@ sub map_fields {
                    'post authorization'   => 'PRIOR_AUTH_CAPTURE',
                    'void'                 => 'VOID',
                   );
-    $content{'action'} = $actions{lc($content{'action'})} || $content{'action'};
+    $content{'action'} = $actions{lc($content{'action'} || '')} || $content{'action'};
 
     # TYPE MAP
     my %types = ('visa'               => 'CC',
@@ -47,7 +44,7 @@ sub map_fields {
                  'discover'           => 'CC',
                  'check'              => 'ECHECK',
                 );
-    $content{'type'} = $types{lc($content{'type'})} || $content{'type'};
+    $content{'type'} = $types{lc($content{'type'} || '')} || $content{'type'};
     $self->transaction_type($content{'type'});
 
     # ACCOUNT TYPE MAP
@@ -56,12 +53,8 @@ sub map_fields {
                          'business checking'   => 'CHECKING',
                          'business savings'    => 'SAVINGS',
                         );
-    $content{'account_type'} = $account_types{lc($content{'account_type'})}
+    $content{'account_type'} = $account_types{lc($content{'account_type'} || '')}
                                || $content{'account_type'};
-
-    $content{'referer'} = defined( $content{'referer'} )
-                            ? make_headers( 'Referer' => $content{'referer'} )
-                            : "";
 
     if (length $content{'password'} == 15) {
         $content{'transaction_key'} = delete $content{'password'};
@@ -259,12 +252,13 @@ sub submit {
     $post_data{'x_ADC_URL'} = 'FALSE';
     $post_data{'x_Version'} = '3.1';
 
-    my $pd = make_form(%post_data);
-    my $s = $self->server();
-    my $p = $self->port();
-    my $t = $self->path();
-    my $r = $self->{_content}->{referer};
-    my($page,$server_response,%headers) = post_https($s,$p,$t,$r,$pd);
+    my $opt = defined( $self->{_content}->{referer} )
+                ? { 'headers' => { 'Referer' => $self->{_content}->{referer} } }
+                : {};
+
+    my($page, $server_response, %headers) =
+      $self->https_post( $opt, \%post_data );
+
     #escape NULL (binary 0x00) values
     $page =~ s/\x00/\^0/g;
 
@@ -294,7 +288,11 @@ sub submit {
         $self->is_success(0);
         $self->result_code($col[2]);
         $self->error_message($col[3]);
-        unless ( $self->result_code() ) { #additional logging information
+        if ( $self->result_code ) {
+          my $addl = $ERRORS{ $self->result_code };
+          $self->error_message( $self->error_message. ' - '. $addl->{notes})
+            if $addl && ref($addl) eq 'HASH' && $addl->{notes};
+        } else { #additional logging information
           #$page =~ s/\x00/\^0/g;
           $self->error_message($col[3].
             " DEBUG: No x_response_code from server, ".

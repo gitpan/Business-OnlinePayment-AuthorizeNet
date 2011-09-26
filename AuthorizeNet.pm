@@ -6,7 +6,7 @@ use Business::OnlinePayment;
 use vars qw($VERSION @ISA $me);
 
 @ISA = qw(Business::OnlinePayment);
-$VERSION = '3.21';
+$VERSION = '3.22';
 $me = 'Business::OnlinePayment::AuthorizeNet';
 
 sub set_defaults {
@@ -443,6 +443,9 @@ fields: tax, freight, duty, tax_exempt, po_number.
 
 Michael Peters fixed a bug in email address handling.
 
+Thomas Sibley <trs@bestpractical.com> wrote B:OP:AuthorizeNet::AIM::ErrorCodes
+which was borged and used to provide more descriptive error messages.
+
 =head1 CONTRIBUTIONS AND REPOSITORY
 
 Please send patches as unified diffs (diff -u) to (in order of preference):
@@ -473,6 +476,22 @@ The code is available from our public CVS repository:
 Or on the web:
 
   http://freeside.biz/cgi-bin/viewvc.cgi/Business-OnlinePayment-AuthorizeNet/
+
+=head1 A WORD FROM OUR SPONSOR
+
+This module and the Business::OnlinePayment framework are maintained by by
+Freeside Internet Services.  If you need a complete, open-source web-based
+application to manage your customers, billing and trouble ticketing, please
+visit http://freeside.biz/
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2010 Freeside Internet Services, Inc.
+Copyright 2008 Thomas Sibley
+All rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
 
 =head1 SEE ALSO
 

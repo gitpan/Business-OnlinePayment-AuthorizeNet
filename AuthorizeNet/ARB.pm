@@ -39,7 +39,7 @@ sub map_fields {
                    'cancel recurring authorization'
                       => 'ARBCancelSubscriptionRequest',
                   );
-    $content{'action'} = $actions{lc($content{'action'})} || $content{'action'};
+    $content{'action'} = $actions{lc($content{'action'} || '')} || $content{'action'};
 
     # TYPE MAP
     my %types = ('visa'               => 'CC',
@@ -48,7 +48,7 @@ sub map_fields {
                  'discover'           => 'CC',
                  'check'              => 'ECHECK',
                 );
-    $content{'type'} = $types{lc($content{'type'})} || $content{'type'};
+    $content{'type'} = $types{lc($content{'type'} || '')} || $content{'type'};
     $self->transaction_type($content{'type'});
 
     # ACCOUNT TYPE MAP
@@ -57,7 +57,7 @@ sub map_fields {
                          'business checking'   => 'businessChecking',
                          'business savings'    => 'savings',
                         );
-    $content{'account_type'} = $account_types{lc($content{'account_type'})}
+    $content{'account_type'} = $account_types{lc($content{'account_type'} || '')}
                                || $content{'account_type'};
 
     # MASSAGE EXPIRATION 

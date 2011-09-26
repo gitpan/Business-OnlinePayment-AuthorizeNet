@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Business-OnlinePayment-AuthorizeNet
-version:            3.21
+version:            3.22
 abstract:           ~
 author:
     - Ivan Kohler <ivan-authorizenet@420.am>
@@ -13,7 +13,7 @@ build_requires:
 requires:
     Business::OnlinePayment:  3
     Business::OnlinePayment::HTTPS:  0
-    Net::SSLeay:          0
+    Net::HTTPS::Any:      0
     Test::More:           0.42
     Text::CSV_XS:         0
     Tie::IxHash:          0
@@ -23,7 +23,7 @@ no_index:
     directory:
         - t
         - inc
-generated_by:       ExtUtils::MakeMaker version 6.55_02
+generated_by:       ExtUtils::MakeMaker version 6.56
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4

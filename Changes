@@ -1,5 +1,16 @@
 Revision history for Perl extension Business::OnlinePayment::AuthorizeNet.
 
+3.22  Mon Sep 26 15:06:52 PDT 2011
+        - Add missing t/lib/Business/FraudDetect/_Fake.pm to MANIFEST to fix
+          tests.  Patch from Rob Brown, thanks!  (closes: CPAN#52444)
+        - Incorporate Business::OnlinePayment::AuthorizeNet::AIM::ErrorCodes by
+          Thomas Sibley and, using it, provide more descriptive error messages.
+          (closes: CPAN#34362)
+        - Switch to Business::OnlinePayment::HTTPS instead of using Net::SSLeay
+          directly
+        - Silence new warnings about lc(undef) introduced in perl 5.12.  Patch
+          from Todd Rinaldo, thanks!  (closes: CPAN#56172)
+
 3.21  Tue Nov 24 10:45:21 PST 2009
         - Add repository, contributing and contirbutor information to the docs.
         - Patch from Nate Nuss <ogmoid[...]gmail.com> implementing ("Additional
